@@ -8,6 +8,19 @@ export interface IMessage {
   citationNetwork?: any
 }
 
+export interface ChatMetadata {
+  authors?: string[]
+  keywords?: string[]
+  abstracts?: string[]
+  tldrs?: string[]
+  publicationTypes?: string[]
+  publishedDates?: (Date | null)[]
+  quartileRankings?: string[]
+  journalNames?: string[]
+  citationCounts?: number[]
+  [key: string]: any
+}
+
 export interface IChat extends Document {
   projectId: mongoose.Types.ObjectId
   userId: mongoose.Types.ObjectId
@@ -15,6 +28,7 @@ export interface IChat extends Document {
   messages: IMessage[]
   depth?: number
   isFavorite?: boolean
+  chatMetadata?: ChatMetadata
   createdAt: Date
   updatedAt: Date
 }
@@ -71,6 +85,20 @@ const ChatSchema = new Schema<IChat>({
     type: Boolean,
     default: false,
     index: true,
+  },
+  chatMetadata: {
+    type: Schema.Types.Mixed,
+    default: {
+      authors: [],
+      keywords: [],
+      abstracts: [],
+      tldrs: [],
+      publicationTypes: [],
+      publishedDates: [],
+      quartileRankings: [],
+      journalNames: [],
+      citationCounts: [],
+    },
   },
   createdAt: {
     type: Date,

@@ -107,13 +107,24 @@ export async function POST(request: Request) {
       )
     }
 
-    // Create chat
+    // Create chat with initialized metadata
     const chat = new Chat({
       projectId,
       userId: user.userId,
       title: title.trim(),
       messages: [],
       depth: depth !== undefined ? Math.max(1, Math.min(500, depth)) : 100,
+      chatMetadata: {
+        authors: [],
+        keywords: [],
+        abstracts: [],
+        tldrs: [],
+        publicationTypes: [],
+        publishedDates: [],
+        quartileRankings: [],
+        journalNames: [],
+        citationCounts: [],
+      },
     })
 
     await chat.save()
