@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import connectDB from '@/lib/db'
 import Chat from '@/models/Chat'
+import Project from '@/models/Project'
 import { saveCitationNetwork } from '@/lib/file-system'
 import mongoose from 'mongoose'
 
@@ -19,6 +20,11 @@ export async function POST(
     }
 
     await connectDB()
+
+    // Ensure Project model is registered before populate
+    if (!mongoose.models.Project) {
+      require('@/models/Project')
+    }
 
     const { id } = await params
 

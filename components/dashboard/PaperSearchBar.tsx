@@ -23,7 +23,9 @@ export function PaperSearchBar({ onSearchResults, onError }: PaperSearchBarProps
     onError('')
 
     try {
-      const response = await fetch(`/api/veritus/papers/search?title=${encodeURIComponent(searchQuery.trim())}`)
+      const searchUrl = new URL('/api/v1/papers/search', window.location.origin)
+      searchUrl.searchParams.set('title', searchQuery.trim())
+      const response = await fetch(searchUrl.toString())
       
       if (!response.ok) {
         const errorData = await response.json()
@@ -31,7 +33,8 @@ export function PaperSearchBar({ onSearchResults, onError }: PaperSearchBarProps
       }
 
       const data = await response.json()
-      onSearchResults(data.papers || [])
+      // New API returns { paper, ... } for single result, wrap in array
+      onSearchResults(data.paper ? [data.paper] : data.papers || [])
     } catch (error: any) {
       console.error('Search error:', error)
       onError(error.message || 'Failed to search papers. Please check your API key settings.')

@@ -110,14 +110,16 @@ export function usePaperCache(chatId?: string | null, messages?: any[]) {
 
       // Fetch from API
       try {
-        const response = await fetch('/api/paper/search', {
-          method: 'POST',
+        const corpusUrl = new URL(`/api/v1/papers/${paperId}`, window.location.origin)
+        if (chatId) {
+          corpusUrl.searchParams.set('chatId', chatId)
+        }
+        if (useMock) {
+          corpusUrl.searchParams.set('mock', 'true')
+        }
+        const response = await fetch(corpusUrl.toString(), {
+          method: 'GET',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            corpusId: paperId,
-            chatId, // Include chatId so it can be saved to chat
-            isMocked: useMock,
-          }),
         })
 
         if (response.ok) {
