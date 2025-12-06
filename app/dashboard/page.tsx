@@ -422,14 +422,17 @@ export default function DashboardPage() {
         if (isSearchQuery) {
           try {
             // Call paper search API
-            const searchResponse = await fetch('/api/paper/search', {
-              method: 'POST',
+            const searchUrl = new URL('/api/v1/papers/search', window.location.origin)
+            searchUrl.searchParams.set('title', content)
+            if (selectedChat) {
+              searchUrl.searchParams.set('chatId', selectedChat)
+            }
+            if (useMock) {
+              searchUrl.searchParams.set('mock', 'true')
+            }
+            const searchResponse = await fetch(searchUrl.toString(), {
+              method: 'GET',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                title: content,
-                chatId: selectedChat,
-                isMocked: useMock, // Use configurable mock mode
-              }),
             })
 
             if (searchResponse.ok) {

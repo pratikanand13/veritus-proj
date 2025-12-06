@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CitationTree } from './CitationTree'
-import { CitationNetworkSelector } from './CitationNetworkSelector'
+import { KeywordSelectionPanel } from './KeywordSelectionPanel'
 import { LoadingOverlay } from '@/components/ui/loading-overlay'
 import { SearchResultsSkeleton } from './SearchResultsSkeleton'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -34,7 +34,7 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
   const [saveToChat, setSaveToChat] = useState(true)
   const [citationNetworkResponse, setCitationNetworkResponse] = useState<CitationNetworkResponse | null>(null)
   const [loadingCitationNetwork, setLoadingCitationNetwork] = useState(false)
-  const [showCitationNetworkSelector, setShowCitationNetworkSelector] = useState(false)
+  const [showKeywordSelectionPanel, setShowKeywordSelectionPanel] = useState(false)
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; timestamp: Date; papers?: VeritusPaper[] }>>([])
   
   // Determine if mock mode should be used (configurable via environment or defaults)
@@ -72,16 +72,20 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
     setCorpusResult(null)
 
     try {
-      const response = await fetch('/api/paper/search', {
-        method: 'POST',
+      const searchUrl = new URL('/api/v1/papers/search', window.location.origin)
+      searchUrl.searchParams.set('title', titleQuery.trim())
+      if (saveToChat && chatId) {
+        searchUrl.searchParams.set('chatId', chatId)
+      }
+      if (useMock) {
+        searchUrl.searchParams.set('mock', 'true')
+      }
+
+      const response = await fetch(searchUrl.toString(), {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          title: titleQuery.trim(),
-          chatId: saveToChat && chatId ? chatId : undefined,
-          isMocked: useMock, // Use configurable mock mode
-        }),
       })
 
       if (!response.ok) {
@@ -124,16 +128,19 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
     setCorpusResult(null)
 
     try {
-      const response = await fetch('/api/paper/search', {
-        method: 'POST',
+      const corpusUrl = new URL(`/api/v1/papers/${corpusIdQuery.trim()}`, window.location.origin)
+      if (saveToChat && chatId) {
+        corpusUrl.searchParams.set('chatId', chatId)
+      }
+      if (useMock) {
+        corpusUrl.searchParams.set('mock', 'true')
+      }
+
+      const response = await fetch(corpusUrl.toString(), {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          corpusId: corpusIdQuery.trim(),
-          chatId: saveToChat && chatId ? chatId : undefined,
-          isMocked: useMock, // Use configurable mock mode
-        }),
       })
 
       if (!response.ok) {
@@ -141,8 +148,14 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
         throw new Error(errorData.error || 'Failed to search paper')
       }
 
-      const data: SearchPaperResponse = await response.json()
-      setSearchResult(data)
+      const data = await response.json()
+      // Transform response to match SearchPaperResponse format
+      const searchResponse: SearchPaperResponse = {
+        paper: data.paper,
+        message: data.message || 'Paper found successfully',
+        isMocked: data.isMocked || false,
+      }
+      setSearchResult(searchResponse)
       
       // Automatically call corpus API after search succeeds
       if (data.paper?.id) {
@@ -269,25 +282,26 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
         let searchResponse: Response
         if (paper.id && paper.id.startsWith('corpus:')) {
           // Use corpusId
-          searchResponse = await fetch('/api/paper/search', {
-            method: 'POST',
+          const corpusUrl = new URL(`/api/v1/papers/${paper.id}`, window.location.origin)
+          corpusUrl.searchParams.set('chatId', newChatId)
+          if (useMock) {
+            corpusUrl.searchParams.set('mock', 'true')
+          }
+          searchResponse = await fetch(corpusUrl.toString(), {
+            method: 'GET',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              corpusId: paper.id,
-              chatId: newChatId,
-              isMocked: useMock,
-            }),
           })
         } else if (paper.title) {
           // Use title
-          searchResponse = await fetch('/api/paper/search', {
-            method: 'POST',
+          const searchUrl = new URL('/api/v1/papers/search', window.location.origin)
+          searchUrl.searchParams.set('title', paper.title)
+          searchUrl.searchParams.set('chatId', newChatId)
+          if (useMock) {
+            searchUrl.searchParams.set('mock', 'true')
+          }
+          searchResponse = await fetch(searchUrl.toString(), {
+            method: 'GET',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              title: paper.title,
-              chatId: newChatId,
-              isMocked: useMock,
-            }),
           })
         } else {
           throw new Error('No corpusId or title available')
@@ -359,66 +373,41 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
     }
   }
 
-  const handleGenerateCitationNetwork = async (params: {
+  const handleSearchSimilarPapers = async (params: {
     corpusId: string
-    depth: number
-    simple: boolean
     keywords: string[]
     authors: string[]
     references: string[]
   }) => {
-    setLoadingCitationNetwork(true)
+    setLoadingCorpus(true)
     setError(null)
     
-    // Add explanatory message before generating the network
-    const paramDetails: string[] = []
-    if (params.keywords.length > 0) {
-      paramDetails.push(`${params.keywords.length} keyword${params.keywords.length !== 1 ? 's' : ''}`)
-    }
-    if (params.authors.length > 0) {
-      paramDetails.push(`${params.authors.length} author${params.authors.length !== 1 ? 's' : ''}`)
-    }
-    if (params.references.length > 0) {
-      paramDetails.push(`${params.references.length} reference${params.references.length !== 1 ? 's' : ''}`)
-    }
-    
-    const preGenerationMessage = {
-      role: 'assistant' as const,
-      content: `Generating citation network${params.simple ? ' (Simple Mode - Semantic Similarity)' : ' (Full Mode - Citation Network)'}...\n\n${paramDetails.length > 0 ? `Using: ${paramDetails.join(', ')}` : 'Using default parameters'}\n\nThis may take a few moments.`,
-      timestamp: new Date(),
-    }
-    
-    setMessages(prev => [...prev, preGenerationMessage])
-    
     try {
-      const response = await fetch('/api/paper/citation-network', {
+      const response = await fetch('/api/citation-network', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           corpusId: params.corpusId,
-          depth: params.depth,
-          simple: params.simple,
           keywords: params.keywords,
           authors: params.authors,
           references: params.references,
           chatId: saveToChat && chatId ? chatId : undefined,
-          isMocked: useMock, // Use configurable mock mode
-          sortBy: 'relevance', // Default sort by relevance
         }),
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to generate citation network')
+        throw new Error(errorData.error || 'Failed to search similar papers')
       }
 
-      const data: CitationNetworkResponse = await response.json()
-      setCitationNetworkResponse(data)
+      const data = await response.json()
+      // Handle response data here when API is implemented
+      console.log('Search similar papers response:', data)
     } catch (err: any) {
-      console.error('Error generating citation network:', err)
-      setError(err.message || 'Failed to generate citation network')
+      console.error('Error searching similar papers:', err)
+      setError(err.message || 'Failed to search similar papers')
     } finally {
-      setLoadingCitationNetwork(false)
+      setLoadingCorpus(false)
     }
   }
 
@@ -435,6 +424,7 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
           <p className="text-muted-foreground text-base">Search for academic papers by title or corpus ID</p>
         </div>
 
+        <div className="space-y-6 mt-6">
         {/* Chat Selection Info */}
         {projectId && (
           <Card>
@@ -695,11 +685,11 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                 )}
                 {searchResult.paper.id && (
                   <Button
-                    onClick={() => setShowCitationNetworkSelector(true)}
-                    className=""
+                    onClick={() => setShowKeywordSelectionPanel(true)}
+                    className="bg-[#FF6B35] hover:bg-[#FF6B35]/80 text-white"
                   >
-                    <Network className="h-4 w-4 mr-2" />
-                    Generate Citation Graph
+                    <Search className="h-4 w-4 mr-2" />
+                    Search Similar Papers
                   </Button>
                 )}
               </div>
@@ -885,18 +875,18 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
           </div>
         )}
         </div>
+        </div>
       </div>
 
-      {/* Citation Network Selector */}
+      {/* Keyword Selection Panel */}
       {searchResult?.paper?.id && (
-        <CitationNetworkSelector
-          open={showCitationNetworkSelector}
-          onOpenChange={setShowCitationNetworkSelector}
+        <KeywordSelectionPanel
+          open={showKeywordSelectionPanel}
+          onOpenChange={setShowKeywordSelectionPanel}
           corpusId={searchResult.paper.id}
-          depth={chatDepth}
           messages={messages}
           chatId={chatId}
-          onGenerate={handleGenerateCitationNetwork}
+          onSearch={handleSearchSimilarPapers}
         />
       )}
 
