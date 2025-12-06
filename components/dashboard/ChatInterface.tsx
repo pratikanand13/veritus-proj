@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Mic, MicOff, Plus, FileText, Network, ThumbsUp, ThumbsDown, Copy, RotateCcw, TreePine, X } from 'lucide-react'
+import { Send, Mic, MicOff, Plus, FileText, Network, ThumbsUp, ThumbsDown, Copy, RotateCcw, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -490,17 +490,6 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
                           }}
                         />
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowCitationTreeModal(true)}
-                        className="flex-shrink-0 mt-0"
-                        title="View Citation Tree Visualization"
-                      >
-                        <TreePine className="h-4 w-4 mr-2" />
-                        Tree View
-                      </Button>
                     </div>
                   </div>
                 )}
@@ -521,6 +510,16 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
       {/* Input Area */}
       <div className="border-t border-border p-4 bg-background flex-shrink-0">
         <div className="flex gap-2 mb-2 flex-wrap items-center">
+          <Button
+            type="button"
+            onClick={() => setShowCitationTreeModal(true)}
+            variant="outline"
+            className="text-xs"
+            title="View Citation Tree Visualization"
+          >
+            <Network className="mr-2 h-3 w-3" />
+            Citation Network
+          </Button>
           <Button
             type="button"
             onClick={() => setShowKeywordSelectionPanel(true)}
