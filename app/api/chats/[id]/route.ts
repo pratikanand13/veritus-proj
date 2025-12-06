@@ -21,6 +21,11 @@ export async function GET(
 
     await connectDB()
 
+    // Ensure Project model is registered before populate
+    if (!mongoose.models.Project) {
+      require('@/models/Project')
+    }
+
     const { id } = await params
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -77,6 +82,11 @@ export async function PUT(
     }
 
     await connectDB()
+
+    // Ensure Project model is registered before populate
+    if (!mongoose.models.Project) {
+      require('@/models/Project')
+    }
 
     const { id } = await params
 

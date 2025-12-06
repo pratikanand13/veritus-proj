@@ -16,7 +16,6 @@ import { shouldUseMockData } from '@/lib/config/mock-config'
 interface AdvancedPaperSearchProps {
   chatId?: string | null
   onSearchResults: (papers: VeritusPaper[]) => void
-  onGenerateCitationNetwork?: (papers: VeritusPaper[]) => void
 }
 
 const VALID_FIELDS_OF_STUDY = [
@@ -30,7 +29,7 @@ const VALID_FIELDS_OF_STUDY = [
 const VALID_QUARTILE_RANKINGS = ['Q1', 'Q2', 'Q3', 'Q4']
 const VALID_PUBLICATION_TYPES = ['journal', 'book series', 'conference']
 
-export function AdvancedPaperSearch({ chatId, onSearchResults, onGenerateCitationNetwork }: AdvancedPaperSearchProps) {
+export function AdvancedPaperSearch({ chatId, onSearchResults }: AdvancedPaperSearchProps) {
   const [phrases, setPhrases] = useState<string[]>([''])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
@@ -502,16 +501,6 @@ export function AdvancedPaperSearch({ chatId, onSearchResults, onGenerateCitatio
               <h3 className="text-white font-medium">
                 Results ({results.length})
               </h3>
-              {onGenerateCitationNetwork && (
-                <Button
-                  onClick={() => onGenerateCitationNetwork(results)}
-                  variant="outline"
-                  className="border-[#FF6B35] text-[#FF6B35] hover:bg-[#FF6B35] hover:text-white"
-                >
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Generate Citation Network
-                </Button>
-              )}
             </div>
             <div className="space-y-2 max-h-[400px] overflow-y-auto">
               {results.map((paper, idx) => (

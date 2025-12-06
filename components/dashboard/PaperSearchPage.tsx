@@ -7,12 +7,10 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CitationTree } from './CitationTree'
-import { CitationNetworkSelector } from './CitationNetworkSelector'
-import { AdvancedPaperSearch } from './AdvancedPaperSearch'
+import { KeywordSelectionPanel } from './KeywordSelectionPanel'
 import { LoadingOverlay } from '@/components/ui/loading-overlay'
 import { SearchResultsSkeleton } from './SearchResultsSkeleton'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Paper } from '@/types/paper-api'
 import { SearchPaperResponse, CorpusResponse, CitationNetworkResponse } from '@/types/paper-api'
 import { VeritusPaper } from '@/types/veritus'
@@ -36,9 +34,8 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
   const [saveToChat, setSaveToChat] = useState(true)
   const [citationNetworkResponse, setCitationNetworkResponse] = useState<CitationNetworkResponse | null>(null)
   const [loadingCitationNetwork, setLoadingCitationNetwork] = useState(false)
-  const [showCitationNetworkSelector, setShowCitationNetworkSelector] = useState(false)
+  const [showKeywordSelectionPanel, setShowKeywordSelectionPanel] = useState(false)
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; timestamp: Date; papers?: VeritusPaper[] }>>([])
-  const [advancedSearchResults, setAdvancedSearchResults] = useState<VeritusPaper[]>([])
   
   // Determine if mock mode should be used (configurable via environment or defaults)
   const useMock = shouldUseMockData()
@@ -376,66 +373,41 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
     }
   }
 
-  const handleGenerateCitationNetwork = async (params: {
+  const handleSearchSimilarPapers = async (params: {
     corpusId: string
-    depth: number
-    simple: boolean
     keywords: string[]
     authors: string[]
     references: string[]
   }) => {
-    setLoadingCitationNetwork(true)
+    setLoadingCorpus(true)
     setError(null)
     
-    // Add explanatory message before generating the network
-    const paramDetails: string[] = []
-    if (params.keywords.length > 0) {
-      paramDetails.push(`${params.keywords.length} keyword${params.keywords.length !== 1 ? 's' : ''}`)
-    }
-    if (params.authors.length > 0) {
-      paramDetails.push(`${params.authors.length} author${params.authors.length !== 1 ? 's' : ''}`)
-    }
-    if (params.references.length > 0) {
-      paramDetails.push(`${params.references.length} reference${params.references.length !== 1 ? 's' : ''}`)
-    }
-    
-    const preGenerationMessage = {
-      role: 'assistant' as const,
-      content: `Generating citation network${params.simple ? ' (Simple Mode - Semantic Similarity)' : ' (Full Mode - Citation Network)'}...\n\n${paramDetails.length > 0 ? `Using: ${paramDetails.join(', ')}` : 'Using default parameters'}\n\nThis may take a few moments.`,
-      timestamp: new Date(),
-    }
-    
-    setMessages(prev => [...prev, preGenerationMessage])
-    
     try {
-      const response = await fetch('/api/paper/citation-network', {
+      const response = await fetch('/api/citation-network', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           corpusId: params.corpusId,
-          depth: params.depth,
-          simple: params.simple,
           keywords: params.keywords,
           authors: params.authors,
           references: params.references,
           chatId: saveToChat && chatId ? chatId : undefined,
-          isMocked: useMock, // Use configurable mock mode
-          sortBy: 'relevance', // Default sort by relevance
         }),
       })
 
       if (!response.ok) {
         const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to generate citation network')
+        throw new Error(errorData.error || 'Failed to search similar papers')
       }
 
-      const data: CitationNetworkResponse = await response.json()
-      setCitationNetworkResponse(data)
+      const data = await response.json()
+      // Handle response data here when API is implemented
+      console.log('Search similar papers response:', data)
     } catch (err: any) {
-      console.error('Error generating citation network:', err)
-      setError(err.message || 'Failed to generate citation network')
+      console.error('Error searching similar papers:', err)
+      setError(err.message || 'Failed to search similar papers')
     } finally {
-      setLoadingCitationNetwork(false)
+      setLoadingCorpus(false)
     }
   }
 
@@ -449,21 +421,10 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
             <FileText className="h-8 w-8 text-green-500" />
             <h1 className="text-3xl font-semibold text-foreground">Paper Search</h1>
           </div>
-          <p className="text-muted-foreground text-base">Search for academic papers by title, corpus ID, or advanced filters</p>
+          <p className="text-muted-foreground text-base">Search for academic papers by title or corpus ID</p>
         </div>
 
-        {/* Search Tabs */}
-        <Tabs defaultValue="simple" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 bg-[#171717] border-[#2a2a2a]">
-            <TabsTrigger value="simple" className="data-[state=active]:bg-[#FF6B35] data-[state=active]:text-white">
-              Simple Search
-            </TabsTrigger>
-            <TabsTrigger value="advanced" className="data-[state=active]:bg-[#FF6B35] data-[state=active]:text-white">
-              Advanced Search
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="simple" className="space-y-6 mt-6">
+        <div className="space-y-6 mt-6">
         {/* Chat Selection Info */}
         {projectId && (
           <Card>
@@ -724,11 +685,11 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                 )}
                 {searchResult.paper.id && (
                   <Button
-                    onClick={() => setShowCitationNetworkSelector(true)}
-                    className=""
+                    onClick={() => setShowKeywordSelectionPanel(true)}
+                    className="bg-[#FF6B35] hover:bg-[#FF6B35]/80 text-white"
                   >
-                    <Network className="h-4 w-4 mr-2" />
-                    Generate Citation Graph
+                    <Search className="h-4 w-4 mr-2" />
+                    Search Similar Papers
                   </Button>
                 )}
               </div>
@@ -913,108 +874,19 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
             </p>
           </div>
         )}
-          </TabsContent>
-
-          <TabsContent value="advanced" className="space-y-6 mt-6">
-            <AdvancedPaperSearch
-              chatId={chatId}
-              onSearchResults={(papers) => {
-                setAdvancedSearchResults(papers)
-                setSearchResult(null)
-                setCorpusResult(null)
-              }}
-              onGenerateCitationNetwork={(papers) => {
-                // When user wants to generate citation network from advanced search results
-                if (papers.length > 0) {
-                  const primaryPaper = papers[0]
-                  handleGenerateCitationNetwork({
-                    corpusId: primaryPaper.id,
-                    depth: chatDepth,
-                    simple: false,
-                    keywords: papers.flatMap(p => p.fieldsOfStudy || []),
-                    authors: papers.flatMap(p => p.authors?.split(',').map(a => a.trim()) || []),
-                    references: [],
-                  })
-                }
-              }}
-            />
-
-            {/* Display Advanced Search Results */}
-            {advancedSearchResults.length > 0 && (
-              <Card className="bg-[#1f1f1f] border-[#2a2a2a]">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center justify-between">
-                    <span>Search Results ({advancedSearchResults.length})</span>
-                    <Button
-                      onClick={() => {
-                        if (advancedSearchResults.length > 0) {
-                          const primaryPaper = advancedSearchResults[0]
-                          handleGenerateCitationNetwork({
-                            corpusId: primaryPaper.id,
-                            depth: chatDepth,
-                            simple: false,
-                            keywords: advancedSearchResults.flatMap(p => p.fieldsOfStudy || []),
-                            authors: advancedSearchResults.flatMap(p => p.authors?.split(',').map(a => a.trim()) || []),
-                            references: [],
-                          })
-                        }
-                      }}
-                      variant="outline"
-                      className="border-[#FF6B35] text-[#FF6B35] hover:bg-[#FF6B35] hover:text-white"
-                    >
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      Generate Citation Network
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                    {advancedSearchResults.map((paper, idx) => (
-                      <Card
-                        key={paper.id || idx}
-                        className="bg-[#171717] border-[#2a2a2a] hover:border-[#FF6B35]/50 transition-all cursor-pointer"
-                        onClick={() => handlePaperClick(paper)}
-                      >
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-white text-base mb-2 line-clamp-2">
-                            {paper.title}
-                          </CardTitle>
-                          <CardDescription className="text-gray-400 text-sm mb-2">
-                            {paper.authors}
-                          </CardDescription>
-                          <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-                            {paper.year && <span>{paper.year}</span>}
-                            {paper.journalName && <span>• {paper.journalName}</span>}
-                            {paper.impactFactor?.citationCount && (
-                              <span>• {paper.impactFactor.citationCount} citations</span>
-                            )}
-                            {paper.score && <span>• Score: {paper.score.toFixed(2)}</span>}
-                            {paper.isOpenAccess && (
-                              <span className="text-green-400">• Open Access</span>
-                            )}
-                          </div>
-                        </CardHeader>
-                      </Card>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-        </Tabs>
+        </div>
         </div>
       </div>
 
-      {/* Citation Network Selector */}
+      {/* Keyword Selection Panel */}
       {searchResult?.paper?.id && (
-        <CitationNetworkSelector
-          open={showCitationNetworkSelector}
-          onOpenChange={setShowCitationNetworkSelector}
+        <KeywordSelectionPanel
+          open={showKeywordSelectionPanel}
+          onOpenChange={setShowKeywordSelectionPanel}
           corpusId={searchResult.paper.id}
-          depth={chatDepth}
           messages={messages}
           chatId={chatId}
-          onGenerate={handleGenerateCitationNetwork}
+          onSearch={handleSearchSimilarPapers}
         />
       )}
 

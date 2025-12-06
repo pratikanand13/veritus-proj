@@ -9,7 +9,7 @@ import { PaperSearchBar } from './PaperSearchBar'
 import { PaperSearchResults } from './PaperSearchResults'
 import { CitationNetworkEnhanced as CitationNetwork } from './CitationNetworkEnhanced'
 import { CitationTree } from './CitationTree'
-import { CitationNetworkSelector } from './CitationNetworkSelector'
+import { KeywordSelectionPanel } from './KeywordSelectionPanel'
 import { LoadingOverlay } from '@/components/ui/loading-overlay'
 import { VeritusPaper } from '@/types/veritus'
 import { CitationNetworkResponse } from '@/types/paper-api'
@@ -44,7 +44,7 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
   const [showNetwork, setShowNetwork] = useState(false)
   const [searchError, setSearchError] = useState('')
   const [depth, setDepth] = useState(chatDepth)
-  const [showCitationNetworkSelector, setShowCitationNetworkSelector] = useState(false)
+  const [showKeywordSelectionPanel, setShowKeywordSelectionPanel] = useState(false)
   const [loadingCitationNetwork, setLoadingCitationNetwork] = useState(false)
   const [currentCorpusId, setCurrentCorpusId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -60,8 +60,9 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Find the most recent paper result to get corpusId
+  // Find the most recent paper result to get corpusId for keyword selection
   useEffect(() => {
+    let foundCorpusId = false
     // Look for the last paper in messages
     for (let i = messages.length - 1; i >= 0; i--) {
       const message = messages[i]
@@ -69,7 +70,21 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
         const paper = message.papers[0]
         if (paper && paper.id) {
           setCurrentCorpusId(paper.id)
+          foundCorpusId = true
           break
+        }
+      }
+    }
+    // If no paper found in messages, try citation network
+    if (!foundCorpusId) {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const message = messages[i]
+        if (message && message.citationNetwork && message.citationNetwork.paper) {
+          const paper = message.citationNetwork.paper
+          if (paper && paper.id) {
+            setCurrentCorpusId(paper.id)
+            break
+          }
         }
       }
     }
@@ -82,6 +97,64 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
       // by calling the parent's refresh handler if available
     }
   }, [chatId])
+
+  const handleSearchSimilarPapers = async (params: {
+    corpusId: string
+    keywords: string[]
+    authors: string[]
+    references: string[]
+  }) => {
+    if (!chatId) return
+
+    setLoadingCitationNetwork(true)
+    
+    try {
+      const response = await fetch('/api/citation-network', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          corpusId: params.corpusId,
+          keywords: params.keywords,
+          authors: params.authors,
+          references: params.references,
+          chatId,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to search similar papers')
+      }
+
+      const data = await response.json()
+      // Handle response data here when API is implemented
+      console.log('Search similar papers response:', data)
+      
+      // Add a message about the search
+      if (onAddAssistantMessage) {
+        const paramDetails: string[] = []
+        if (params.keywords.length > 0) {
+          paramDetails.push(`${params.keywords.length} keyword${params.keywords.length !== 1 ? 's' : ''}`)
+        }
+        if (params.authors.length > 0) {
+          paramDetails.push(`${params.authors.length} author${params.authors.length !== 1 ? 's' : ''}`)
+        }
+        if (params.references.length > 0) {
+          paramDetails.push(`${params.references.length} reference${params.references.length !== 1 ? 's' : ''}`)
+        }
+        onAddAssistantMessage(
+          `Searching for similar papers${paramDetails.length > 0 ? ` using ${paramDetails.join(', ')}` : ''}...`
+        )
+      }
+    } catch (err: any) {
+      console.error('Error searching similar papers:', err)
+      if (onAddAssistantMessage) {
+        onAddAssistantMessage(`Error: ${err.message || 'Failed to search similar papers'}`)
+      }
+    } finally {
+      setLoadingCitationNetwork(false)
+    }
+  }
 
   const handleGenerateCitationNetwork = async (params: {
     corpusId: string
@@ -432,26 +505,13 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
         <div className="flex gap-2 mb-2 flex-wrap items-center">
           <Button
             type="button"
-            onClick={() => setShowPaperSearch(!showPaperSearch)}
+            onClick={() => setShowKeywordSelectionPanel(true)}
             variant="outline"
-            className={`text-xs ${
-              showPaperSearch ? 'bg-accent' : ''
-            }`}
+            className="text-xs"
           >
             <FileText className="mr-2 h-3 w-3" />
-            {showPaperSearch ? 'Hide' : 'Search'} Papers
+            Search Papers
           </Button>
-          {currentCorpusId && (
-            <Button
-              type="button"
-              onClick={() => setShowCitationNetworkSelector(true)}
-              variant="outline"
-              className="text-xs"
-            >
-              <Network className="mr-2 h-3 w-3" />
-              Citation Network
-            </Button>
-          )}
           <div className="flex items-center gap-2 ml-auto">
             <Label htmlFor="depth" className="text-xs text-muted-foreground whitespace-nowrap">
               Depth:
@@ -515,18 +575,15 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
         </div>
       </div>
 
-      {/* Citation Network Selector */}
-      {currentCorpusId && (
-        <CitationNetworkSelector
-          open={showCitationNetworkSelector}
-          onOpenChange={setShowCitationNetworkSelector}
-          corpusId={currentCorpusId || ''}
-          depth={depth}
-          messages={messages}
-          chatId={chatId}
-          onGenerate={handleGenerateCitationNetwork}
-        />
-      )}
+      {/* Keyword Selection Panel */}
+      <KeywordSelectionPanel
+        open={showKeywordSelectionPanel}
+        onOpenChange={setShowKeywordSelectionPanel}
+        corpusId={currentCorpusId || 'default'}
+        messages={messages}
+        chatId={chatId}
+        onSearch={handleSearchSimilarPapers}
+      />
 
       {/* Loading Overlay */}
       <LoadingOverlay
