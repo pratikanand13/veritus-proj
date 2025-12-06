@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Mic, MicOff, Plus, FileText, Network, ThumbsUp, ThumbsDown, Copy, RotateCcw } from 'lucide-react'
+import { Send, Mic, MicOff, Plus, FileText, Network, ThumbsUp, ThumbsDown, Copy, RotateCcw, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,6 +10,8 @@ import { PaperSearchResults } from './PaperSearchResults'
 import { CitationNetworkEnhanced as CitationNetwork } from './CitationNetworkEnhanced'
 import { CitationTree } from './CitationTree'
 import { KeywordSelectionPanel } from './KeywordSelectionPanel'
+import { CitationTreeVisualization } from './CitationTreeVisualization'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { LoadingOverlay } from '@/components/ui/loading-overlay'
 import { VeritusPaper } from '@/types/veritus'
 import { CitationNetworkResponse } from '@/types/paper-api'
@@ -47,6 +49,7 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
   const [showKeywordSelectionPanel, setShowKeywordSelectionPanel] = useState(false)
   const [loadingCitationNetwork, setLoadingCitationNetwork] = useState(false)
   const [currentCorpusId, setCurrentCorpusId] = useState<string | null>(null)
+  const [showCitationTreeModal, setShowCitationTreeModal] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
   // Determine if mock mode should be used (configurable via environment or defaults)
@@ -458,32 +461,36 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
                 {/* Show citation network if present */}
                 {message.citationNetwork && (
                   <div className="mt-4">
-                    <CitationTree 
-                      citationNetworkResponse={typeof message.citationNetwork === 'object' && 'paper' in message.citationNetwork ? message.citationNetwork : undefined}
-                      chatId={chatId}
-                      messages={messages}
-                      onExpandNode={async (nodeId: string) => {
-                        try {
-                          const response = await fetch('/api/paper/citation-network', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              corpusId: nodeId,
-                              depth: chatDepth || 50,
-                              chatId,
-                              isMocked: useMock,
-                              sortBy: 'relevance',
-                            }),
-                          })
-                          if (response.ok) {
-                            return await response.json()
-                          }
-                        } catch (error) {
-                          console.error('Error expanding node:', error)
-                        }
-                        return null
-                      }}
-                    />
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <CitationTree 
+                          citationNetworkResponse={typeof message.citationNetwork === 'object' && 'paper' in message.citationNetwork ? message.citationNetwork : undefined}
+                          chatId={chatId}
+                          messages={messages}
+                          onExpandNode={async (nodeId: string) => {
+                            try {
+                              const response = await fetch('/api/paper/citation-network', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  corpusId: nodeId,
+                                  depth: chatDepth || 50,
+                                  chatId,
+                                  isMocked: useMock,
+                                  sortBy: 'relevance',
+                                }),
+                              })
+                              if (response.ok) {
+                                return await response.json()
+                              }
+                            } catch (error) {
+                              console.error('Error expanding node:', error)
+                            }
+                            return null
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -503,6 +510,16 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
       {/* Input Area */}
       <div className="border-t border-border p-4 bg-background flex-shrink-0">
         <div className="flex gap-2 mb-2 flex-wrap items-center">
+          <Button
+            type="button"
+            onClick={() => setShowCitationTreeModal(true)}
+            variant="outline"
+            className="text-xs"
+            title="View Citation Tree Visualization"
+          >
+            <Network className="mr-2 h-3 w-3" />
+            Citation Network
+          </Button>
           <Button
             type="button"
             onClick={() => setShowKeywordSelectionPanel(true)}
@@ -584,6 +601,32 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
         chatId={chatId}
         onSearch={handleSearchSimilarPapers}
       />
+
+      {/* Citation Tree Visualization Modal */}
+      <Dialog open={showCitationTreeModal} onOpenChange={setShowCitationTreeModal}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-[95vw] h-[95vh] p-0 flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-border flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg font-semibold text-foreground">
+                Citation Tree Visualization
+              </DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowCitationTreeModal(false)}
+                className="h-6 w-6"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto p-6 min-h-0 h-full">
+            <div className="h-full w-full">
+              <CitationTreeVisualization />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Loading Overlay */}
       <LoadingOverlay
