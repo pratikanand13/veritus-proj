@@ -144,13 +144,15 @@ const Sidebar = React.forwardRef<
     return (
       <div
         className={cn(
-          "flex h-full w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground",
+          "flex h-screen w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground",
           className
         )}
         ref={ref}
         {...props}
       >
-        {children}
+        <div className="flex h-full w-full flex-col overflow-hidden">
+          {children}
+        </div>
       </div>
     )
   }
@@ -297,7 +299,7 @@ const SidebarHeader = React.forwardRef<HTMLDivElement, React.ComponentProps<"div
       <div
         ref={ref}
         data-sidebar="header"
-        className={cn("flex flex-col gap-2 p-2", className)}
+        className={cn("flex flex-col gap-2 p-2 shrink-0", className)}
         {...props}
       />
     )
@@ -311,7 +313,7 @@ const SidebarFooter = React.forwardRef<HTMLDivElement, React.ComponentProps<"div
       <div
         ref={ref}
         data-sidebar="footer"
-        className={cn("flex flex-col gap-2 p-2", className)}
+        className={cn("flex flex-col gap-2 p-2 mt-auto shrink-0", className)}
         {...props}
       />
     )
@@ -350,7 +352,10 @@ const SidebarGroup = React.forwardRef<HTMLDivElement, React.ComponentProps<"div"
 )
 SidebarGroup.displayName = "SidebarGroup"
 
-const SidebarGroupLabel = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(
+const SidebarGroupLabel = React.forwardRef<
+  HTMLDivElement,
+  React.ComponentProps<"div"> & { asChild?: boolean }
+>(
   ({ className, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "div"
 
@@ -370,7 +375,10 @@ const SidebarGroupLabel = React.forwardRef<HTMLDivElement, React.ComponentProps<
 )
 SidebarGroupLabel.displayName = "SidebarGroupLabel"
 
-const SidebarGroupAction = React.forwardRef<HTMLButtonElement, React.ComponentProps<"button">>(
+const SidebarGroupAction = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<"button"> & { asChild?: boolean }
+>(
   ({ className, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
 
