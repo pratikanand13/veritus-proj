@@ -1,0 +1,33 @@
+{
+  "paper": {
+    "id": "corpus:12345678",
+    "title": "Machine Learning in Healthcare: A Comprehensive Review",
+    "abstract": "This paper provides a comprehensive review of machine learning applications in healthcare, covering various domains including diagnosis, treatment, and patient care.",
+    "authors": "John Doe, Jane Smith, Bob Johnson",
+    "doi": "10.1234/example.2024.001",
+    "year": 2024,
+    "fieldsOfStudy": ["Computer Science", "Medicine", "Artificial Intelligence"],
+    "impactFactor": {
+      "citationCount": 150,
+      "influentialCitationCount": 45,
+      "referenceCount": 80
+    },
+    "pdfLink": "https://example.com/paper.pdf",
+    "link": "https://example.com/paper",
+    "semanticLink": "https://semantic.example.com/paper/12345678",
+    "journalName": "Journal of Healthcare AI",
+    "publicationType": "JournalArticle",
+    "publishedAt": "2024-01-15T00:00:00Z",
+    "score": 0.95,
+    "tldr": "A comprehensive review of ML applications in healthcare",
+    "downloadable": true,
+    "isOpenAccess": true,
+    "isPrePrint": false,
+    "v_country": "USA",
+    "v_journal_name": "Journal of Healthcare AI",
+    "v_publisher": "Example Publisher",
+    "v_quartile_ranking": "Q1"
+  },
+  "message": "Paper found successfully"
+}
+

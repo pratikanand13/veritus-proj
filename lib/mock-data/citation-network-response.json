@@ -1,0 +1,108 @@
+{
+  "paper": {
+    "id": "corpus:12345678",
+    "title": "Machine Learning in Healthcare: A Comprehensive Review",
+    "abstract": "This paper provides a comprehensive review of machine learning applications in healthcare.",
+    "authors": "John Doe, Jane Smith, Bob Johnson",
+    "doi": "10.1234/example.2024.001",
+    "year": 2024,
+    "fieldsOfStudy": ["Computer Science", "Medicine", "Artificial Intelligence"],
+    "impactFactor": {
+      "citationCount": 150,
+      "influentialCitationCount": 45,
+      "referenceCount": 80
+    },
+    "pdfLink": "https://example.com/paper.pdf",
+    "link": "https://example.com/paper",
+    "semanticLink": "https://semantic.example.com/paper/12345678",
+    "journalName": "Journal of Healthcare AI",
+    "publicationType": "JournalArticle",
+    "publishedAt": "2024-01-15T00:00:00Z",
+    "score": 0.95,
+    "tldr": "A comprehensive review of ML applications in healthcare",
+    "downloadable": true,
+    "isOpenAccess": true,
+    "isPrePrint": false
+  },
+  "citationNetwork": {
+    "nodes": [
+      {
+        "id": "corpus:12345678",
+        "label": "Machine Learning in Healthcare: A Comprehensive Review",
+        "citations": 150,
+        "references": 80,
+        "isRoot": true,
+        "type": "root",
+        "year": 2024,
+        "authors": "John Doe, Jane Smith, Bob Johnson"
+      },
+      {
+        "id": "corpus:87654321",
+        "label": "Deep Learning for Medical Image Analysis",
+        "citations": 120,
+        "references": 65,
+        "isRoot": false,
+        "type": "citing",
+        "year": 2024,
+        "authors": "Alice Brown, Charlie Wilson"
+      },
+      {
+        "id": "corpus:11223344",
+        "label": "Natural Language Processing in Clinical Documentation",
+        "citations": 95,
+        "references": 50,
+        "isRoot": false,
+        "type": "referenced",
+        "year": 2023,
+        "authors": "David Lee, Emma Davis"
+      },
+      {
+        "id": "corpus:55667788",
+        "label": "AI-Powered Diagnostic Systems",
+        "citations": 200,
+        "references": 90,
+        "isRoot": false,
+        "type": "both",
+        "year": 2023,
+        "authors": "Frank Miller, Grace Taylor"
+      }
+    ],
+    "edges": [
+      {
+        "source": "corpus:87654321",
+        "target": "corpus:12345678",
+        "type": "cites",
+        "weight": 1
+      },
+      {
+        "source": "corpus:12345678",
+        "target": "corpus:11223344",
+        "type": "references",
+        "weight": 1
+      },
+      {
+        "source": "corpus:55667788",
+        "target": "corpus:12345678",
+        "type": "cites",
+        "weight": 1
+      },
+      {
+        "source": "corpus:12345678",
+        "target": "corpus:55667788",
+        "type": "references",
+        "weight": 1
+      }
+    ],
+    "stats": {
+      "totalNodes": 4,
+      "totalEdges": 4,
+      "citingCount": 2,
+      "referencedCount": 2
+    }
+  },
+  "meta": {
+    "networkType": "citation",
+    "depth": 50
+  }
+}
+

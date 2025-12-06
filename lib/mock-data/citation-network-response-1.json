@@ -1,0 +1,381 @@
+{
+  "paper": {
+    "id": "corpus:12345678",
+    "title": "Machine Learning in Healthcare: A Comprehensive Review",
+    "abstract": "This paper provides a comprehensive review of machine learning applications in healthcare, focusing on predictive modeling for patient outcomes. We explore various deep learning architectures and their effectiveness in medical diagnosis and treatment planning.",
+    "authors": "Sarah Johnson, Michael Chen, Emily Rodriguez, David Kim",
+    "doi": "10.1234/ml-healthcare.2023",
+    "year": 2023,
+    "fieldsOfStudy": ["Computer Science", "Medicine", "Artificial Intelligence"],
+    "impactFactor": {
+      "citationCount": 245,
+      "influentialCitationCount": 38,
+      "referenceCount": 67
+    },
+    "pdfLink": "https://example.com/papers/ml-healthcare-2023.pdf",
+    "link": "https://example.com/papers/ml-healthcare-2023",
+    "semanticLink": "https://www.semanticscholar.org/paper/12345678",
+    "journalName": "Journal of Medical AI",
+    "publicationType": "journal",
+    "publishedAt": "2023-06-15",
+    "score": 0.95,
+    "tldr": "We present a comprehensive analysis of ML applications in healthcare, demonstrating significant improvements in diagnostic accuracy and patient outcome prediction using deep learning models.",
+    "downloadable": true,
+    "isOpenAccess": true,
+    "isPrePrint": false,
+    "v_country": "United States",
+    "v_journal_name": "Journal of Medical AI",
+    "v_publisher": "Academic Press",
+    "v_quartile_ranking": "Q1"
+  },
+  "citationNetwork": {
+    "nodes": [
+      {
+        "id": "corpus:12345678",
+        "label": "Machine Learning in Healthcare: A Comprehensive Analysis",
+        "citations": 245,
+        "references": 67,
+        "isRoot": true,
+        "year": 2023,
+        "authors": "Sarah Johnson, Michael Chen, Emily Rodriguez, David Kim",
+        "type": "root",
+        "score": 0.95,
+        "data": {
+          "id": "corpus:12345678",
+          "title": "Machine Learning in Healthcare: A Comprehensive Analysis",
+          "abstract": "This paper provides a comprehensive review of machine learning applications in healthcare.",
+          "authors": "Sarah Johnson, Michael Chen, Emily Rodriguez, David Kim",
+          "year": 2023,
+          "fieldsOfStudy": ["Computer Science", "Medicine", "Artificial Intelligence"],
+          "impactFactor": {
+            "citationCount": 245,
+            "referenceCount": 67
+          },
+          "journalName": "Journal of Medical AI"
+        }
+      },
+      {
+        "id": "corpus:23456789",
+        "label": "Deep Learning for Medical Image Analysis: A Comprehensive Review",
+        "citations": 189,
+        "references": 54,
+        "year": 2023,
+        "authors": "Robert Williams, Lisa Anderson, James Taylor",
+        "type": "citing",
+        "score": 0.92,
+        "data": {
+          "id": "corpus:23456789",
+          "title": "Deep Learning for Medical Image Analysis: A Comprehensive Review",
+          "authors": "Robert Williams, Lisa Anderson, James Taylor",
+          "year": 2023,
+          "fieldsOfStudy": ["Computer Science", "Medicine"],
+          "impactFactor": {
+            "citationCount": 189,
+            "referenceCount": 54
+          }
+        }
+      },
+      {
+        "id": "corpus:34567890",
+        "label": "Predictive Analytics in Healthcare: Machine Learning Approaches",
+        "citations": 156,
+        "references": 48,
+        "year": 2023,
+        "authors": "Maria Garcia, John Smith, Anna Lee",
+        "type": "citing",
+        "score": 0.88,
+        "data": {
+          "id": "corpus:34567890",
+          "title": "Predictive Analytics in Healthcare: Machine Learning Approaches",
+          "authors": "Maria Garcia, John Smith, Anna Lee",
+          "year": 2023,
+          "fieldsOfStudy": ["Computer Science", "Medicine", "Statistics"],
+          "impactFactor": {
+            "citationCount": 156,
+            "referenceCount": 48
+          }
+        }
+      },
+      {
+        "id": "corpus:45678901",
+        "label": "Neural Networks for Diagnostic Medicine: Multi-Modal Data Fusion",
+        "citations": 134,
+        "references": 42,
+        "year": 2023,
+        "authors": "Chen Wei, Yuki Tanaka, Priya Patel",
+        "type": "citing",
+        "score": 0.85,
+        "data": {
+          "id": "corpus:45678901",
+          "title": "Neural Networks for Diagnostic Medicine: Multi-Modal Data Fusion",
+          "authors": "Chen Wei, Yuki Tanaka, Priya Patel",
+          "year": 2023,
+          "fieldsOfStudy": ["Computer Science", "Medicine"],
+          "impactFactor": {
+            "citationCount": 134,
+            "referenceCount": 42
+          }
+        }
+      },
+      {
+        "id": "corpus:11111111",
+        "label": "Foundations of Machine Learning in Medical Diagnosis",
+        "citations": 312,
+        "references": 89,
+        "year": 2020,
+        "authors": "Dr. Alan Turing, Dr. Grace Hopper",
+        "type": "referenced",
+        "score": 0.90,
+        "data": {
+          "id": "corpus:11111111",
+          "title": "Foundations of Machine Learning in Medical Diagnosis",
+          "authors": "Dr. Alan Turing, Dr. Grace Hopper",
+          "year": 2020,
+          "fieldsOfStudy": ["Computer Science", "Medicine"],
+          "impactFactor": {
+            "citationCount": 312,
+            "referenceCount": 89
+          }
+        }
+      },
+      {
+        "id": "corpus:22222222",
+        "label": "Healthcare Data Mining: Techniques and Applications",
+        "citations": 278,
+        "references": 76,
+        "year": 2021,
+        "authors": "Prof. Jane Smith, Dr. Bob Johnson",
+        "type": "referenced",
+        "score": 0.87,
+        "data": {
+          "id": "corpus:22222222",
+          "title": "Healthcare Data Mining: Techniques and Applications",
+          "authors": "Prof. Jane Smith, Dr. Bob Johnson",
+          "year": 2021,
+          "fieldsOfStudy": ["Computer Science", "Medicine", "Data Mining"],
+          "impactFactor": {
+            "citationCount": 278,
+            "referenceCount": 76
+          }
+        }
+      },
+      {
+        "id": "corpus:33333333",
+        "label": "Deep Learning Architectures for Clinical Decision Support",
+        "citations": 201,
+        "references": 65,
+        "year": 2022,
+        "authors": "Dr. Alice Brown, Dr. Charlie Davis",
+        "type": "referenced",
+        "score": 0.83,
+        "data": {
+          "id": "corpus:33333333",
+          "title": "Deep Learning Architectures for Clinical Decision Support",
+          "authors": "Dr. Alice Brown, Dr. Charlie Davis",
+          "year": 2022,
+          "fieldsOfStudy": ["Computer Science", "Medicine"],
+          "impactFactor": {
+            "citationCount": 201,
+            "referenceCount": 65
+          }
+        }
+      },
+      {
+        "id": "corpus:44444444",
+        "label": "Recent Advances in Medical AI: A Survey",
+        "citations": 167,
+        "references": 58,
+        "year": 2022,
+        "authors": "Dr. Emma Wilson, Dr. Frank Miller",
+        "type": "both",
+        "score": 0.81,
+        "data": {
+          "id": "corpus:44444444",
+          "title": "Recent Advances in Medical AI: A Survey",
+          "authors": "Dr. Emma Wilson, Dr. Frank Miller",
+          "year": 2022,
+          "fieldsOfStudy": ["Computer Science", "Medicine", "Artificial Intelligence"],
+          "impactFactor": {
+            "citationCount": 167,
+            "referenceCount": 58
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "source": "corpus:23456789",
+        "target": "corpus:12345678",
+        "type": "cites",
+        "weight": 1.2,
+        "metadata": {
+          "sharedKeywords": ["Machine Learning", "Medicine"],
+          "sharedAuthors": [],
+          "similarityScore": 0.85,
+          "chatHistoryBoost": 0.0
+        }
+      },
+      {
+        "source": "corpus:34567890",
+        "target": "corpus:12345678",
+        "type": "cites",
+        "weight": 1.1,
+        "metadata": {
+          "sharedKeywords": ["Machine Learning", "Healthcare"],
+          "sharedAuthors": [],
+          "similarityScore": 0.82,
+          "chatHistoryBoost": 0.0
+        }
+      },
+      {
+        "source": "corpus:45678901",
+        "target": "corpus:12345678",
+        "type": "cites",
+        "weight": 1.0,
+        "metadata": {
+          "sharedKeywords": ["Medicine"],
+          "sharedAuthors": [],
+          "similarityScore": 0.78,
+          "chatHistoryBoost": 0.0
+        }
+      },
+      {
+        "source": "corpus:12345678",
+        "target": "corpus:11111111",
+        "type": "references",
+        "weight": 1.3,
+        "metadata": {
+          "sharedKeywords": ["Machine Learning", "Medical Diagnosis"],
+          "sharedAuthors": [],
+          "similarityScore": 0.88,
+          "chatHistoryBoost": 0.0
+        }
+      },
+      {
+        "source": "corpus:12345678",
+        "target": "corpus:22222222",
+        "type": "references",
+        "weight": 1.2,
+        "metadata": {
+          "sharedKeywords": ["Healthcare", "Data Mining"],
+          "sharedAuthors": [],
+          "similarityScore": 0.85,
+          "chatHistoryBoost": 0.0
+        }
+      },
+      {
+        "source": "corpus:12345678",
+        "target": "corpus:33333333",
+        "type": "references",
+        "weight": 1.1,
+        "metadata": {
+          "sharedKeywords": ["Deep Learning", "Clinical"],
+          "sharedAuthors": [],
+          "similarityScore": 0.80,
+          "chatHistoryBoost": 0.0
+        }
+      },
+      {
+        "source": "corpus:12345678",
+        "target": "corpus:44444444",
+        "type": "references",
+        "weight": 1.0,
+        "metadata": {
+          "sharedKeywords": ["Medical AI"],
+          "sharedAuthors": [],
+          "similarityScore": 0.75,
+          "chatHistoryBoost": 0.0
+        }
+      },
+      {
+        "source": "corpus:44444444",
+        "target": "corpus:12345678",
+        "type": "cites",
+        "weight": 1.0,
+        "metadata": {
+          "sharedKeywords": ["Medical AI"],
+          "sharedAuthors": [],
+          "similarityScore": 0.75,
+          "chatHistoryBoost": 0.0
+        }
+      }
+    ],
+    "stats": {
+      "totalNodes": 8,
+      "totalEdges": 8,
+      "citingCount": 3,
+      "referencedCount": 4
+    }
+  },
+  "meta": {
+    "networkType": "citation",
+    "depth": 100,
+    "phrases": [
+      "Machine Learning Applications in Healthcare: A Comprehensive Analysis",
+      "Computer Science",
+      "Medicine",
+      "machine learning",
+      "healthcare diagnostics",
+      "predictive modeling",
+      "Sarah Johnson",
+      "Michael Chen"
+    ],
+    "query": "Research related to Machine Learning Applications in Healthcare: A Comprehensive Analysis. in fields: Computer Science, Medicine, Artificial Intelligence. focusing on keywords: machine learning, healthcare diagnostics, predictive modeling. by authors: Sarah Johnson, Michael Chen. related to references: Foundations of Machine Learning in Medical Diagnosis, Healthcare Data Mining: Techniques and Applications.",
+    "userInputs": {
+      "keywords": [
+        "machine learning",
+        "healthcare",
+        "diagnostics"
+      ],
+      "authors": [
+        "John Smith",
+        "Jane Doe"
+      ],
+      "references": [
+        "corpus:11111111",
+        "Foundations of ML"
+      ]
+    },
+    "mode": "full",
+    "sortBy": "relevance"
+  },
+  "searchResults": [
+    {
+      "id": "corpus:23456789",
+      "title": "Deep Learning for Medical Image Analysis: A Comprehensive Review",
+      "authors": "Robert Williams, Lisa Anderson, James Taylor",
+      "year": 2023,
+      "fieldsOfStudy": ["Computer Science", "Medicine"],
+      "impactFactor": {
+        "citationCount": 189,
+        "referenceCount": 54
+      },
+      "score": 0.92
+    },
+    {
+      "id": "corpus:34567890",
+      "title": "Predictive Analytics in Healthcare: Machine Learning Approaches",
+      "authors": "Maria Garcia, John Smith, Anna Lee",
+      "year": 2023,
+      "fieldsOfStudy": ["Computer Science", "Medicine", "Statistics"],
+      "impactFactor": {
+        "citationCount": 156,
+        "referenceCount": 48
+      },
+      "score": 0.88
+    },
+    {
+      "id": "corpus:45678901",
+      "title": "Neural Networks for Diagnostic Medicine: Multi-Modal Data Fusion",
+      "authors": "Chen Wei, Yuki Tanaka, Priya Patel",
+      "year": 2023,
+      "fieldsOfStudy": ["Computer Science", "Medicine"],
+      "impactFactor": {
+        "citationCount": 134,
+        "referenceCount": 42
+      },
+      "score": 0.85
+    }
+  ]
+}
+

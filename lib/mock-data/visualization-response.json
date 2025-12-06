@@ -1,0 +1,124 @@
+{
+  "paper": {
+    "id": "corpus:12345678",
+    "title": "Machine Learning in Healthcare: A Comprehensive Review",
+    "abstract": "This paper provides a comprehensive review of machine learning applications in healthcare.",
+    "authors": "John Doe, Jane Smith, Bob Johnson",
+    "doi": "10.1234/example.2024.001",
+    "year": 2024,
+    "fieldsOfStudy": ["Computer Science", "Medicine", "Artificial Intelligence"],
+    "impactFactor": {
+      "citationCount": 150,
+      "influentialCitationCount": 45,
+      "referenceCount": 80
+    },
+    "pdfLink": "https://example.com/paper.pdf",
+    "link": "https://example.com/paper",
+    "semanticLink": "https://semantic.example.com/paper/12345678",
+    "journalName": "Journal of Healthcare AI",
+    "publicationType": "JournalArticle",
+    "publishedAt": "2024-01-15T00:00:00Z",
+    "score": 0.95,
+    "tldr": "A comprehensive review of ML applications in healthcare",
+    "downloadable": true,
+    "isOpenAccess": true,
+    "isPrePrint": false
+  },
+  "similarPapers": [
+    {
+      "id": "corpus:87654321",
+      "title": "Deep Learning for Medical Image Analysis",
+      "abstract": "An overview of deep learning techniques applied to medical imaging.",
+      "authors": "Alice Brown, Charlie Wilson",
+      "doi": "10.1234/example.2024.002",
+      "year": 2024,
+      "fieldsOfStudy": ["Computer Science", "Medicine"],
+      "impactFactor": {
+        "citationCount": 120,
+        "influentialCitationCount": 35,
+        "referenceCount": 65
+      },
+      "pdfLink": "https://example.com/paper2.pdf",
+      "link": "https://example.com/paper2",
+      "semanticLink": "https://semantic.example.com/paper/87654321",
+      "journalName": "Medical AI Journal",
+      "publicationType": "JournalArticle",
+      "publishedAt": "2024-02-10T00:00:00Z",
+      "score": 0.92,
+      "tldr": "Deep learning for medical imaging",
+      "downloadable": true,
+      "isOpenAccess": true,
+      "isPrePrint": false
+    },
+    {
+      "id": "corpus:11223344",
+      "title": "Natural Language Processing in Clinical Documentation",
+      "abstract": "Using NLP to extract insights from clinical notes and documentation.",
+      "authors": "David Lee, Emma Davis",
+      "doi": "10.1234/example.2024.003",
+      "year": 2023,
+      "fieldsOfStudy": ["Computer Science", "Medicine", "Natural Language Processing"],
+      "impactFactor": {
+        "citationCount": 95,
+        "influentialCitationCount": 28,
+        "referenceCount": 50
+      },
+      "pdfLink": "https://example.com/paper3.pdf",
+      "link": "https://example.com/paper3",
+      "semanticLink": "https://semantic.example.com/paper/11223344",
+      "journalName": "Clinical Informatics Review",
+      "publicationType": "JournalArticle",
+      "publishedAt": "2023-12-05T00:00:00Z",
+      "score": 0.88,
+      "tldr": "NLP for clinical documentation",
+      "downloadable": true,
+      "isOpenAccess": false,
+      "isPrePrint": false
+    }
+  ],
+  "graph": {
+    "nodes": [
+      {
+        "id": "corpus:12345678",
+        "label": "Machine Learning in Healthcare: A Comprehensive Review",
+        "citations": 150,
+        "isRoot": true
+      },
+      {
+        "id": "corpus:87654321",
+        "label": "Deep Learning for Medical Image Analysis",
+        "citations": 120,
+        "isRoot": false
+      },
+      {
+        "id": "corpus:11223344",
+        "label": "Natural Language Processing in Clinical Documentation",
+        "citations": 95,
+        "isRoot": false
+      }
+    ],
+    "edges": [
+      {
+        "source": "corpus:12345678",
+        "target": "corpus:87654321",
+        "weight": 0.85
+      },
+      {
+        "source": "corpus:12345678",
+        "target": "corpus:11223344",
+        "weight": 0.78
+      },
+      {
+        "source": "corpus:87654321",
+        "target": "corpus:11223344",
+        "weight": 0.65
+      }
+    ]
+  },
+  "meta": {
+    "phrases": ["machine learning", "healthcare", "medical applications"],
+    "query": "machine learning healthcare",
+    "depth": 50
+  }
+}
+

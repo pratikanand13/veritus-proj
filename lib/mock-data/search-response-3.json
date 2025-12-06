@@ -1,0 +1,33 @@
+{
+  "paper": {
+    "id": "corpus:55555555",
+    "title": "Computer Vision for Autonomous Vehicles: A Survey",
+    "abstract": "This survey paper reviews computer vision techniques used in autonomous vehicle systems, including object detection, semantic segmentation, and path planning algorithms.",
+    "authors": "Robert Kim, Emily Park, James Lee",
+    "doi": "10.9999/cv.2023.123",
+    "year": 2023,
+    "fieldsOfStudy": ["Computer Science", "Computer Vision", "Robotics"],
+    "impactFactor": {
+      "citationCount": 245,
+      "influentialCitationCount": 67,
+      "referenceCount": 95
+    },
+    "pdfLink": "https://example.com/cv-paper.pdf",
+    "link": "https://example.com/cv-paper",
+    "semanticLink": "https://semantic.example.com/paper/55555555",
+    "journalName": "IEEE Transactions on Robotics",
+    "publicationType": "JournalArticle",
+    "publishedAt": "2023-11-10T00:00:00Z",
+    "score": 0.91,
+    "tldr": "Survey of computer vision techniques for autonomous vehicles",
+    "downloadable": true,
+    "isOpenAccess": false,
+    "isPrePrint": false,
+    "v_country": "USA",
+    "v_journal_name": "IEEE Transactions on Robotics",
+    "v_publisher": "IEEE",
+    "v_quartile_ranking": "Q1"
+  },
+  "message": "Paper found successfully"
+}
+

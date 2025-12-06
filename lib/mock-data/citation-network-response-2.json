@@ -1,0 +1,278 @@
+{
+  "paper": {
+    "id": "corpus:98765432",
+    "title": "Deep Learning Architectures for Natural Language Processing",
+    "abstract": "This paper explores advanced deep learning architectures including transformers, BERT, and GPT models for natural language understanding and generation tasks.",
+    "authors": "Sarah Chen, Michael Zhang, Lisa Wang",
+    "doi": "10.5678/nlp.2024.045",
+    "year": 2024,
+    "fieldsOfStudy": ["Computer Science", "Natural Language Processing", "Machine Learning"],
+    "impactFactor": {
+      "citationCount": 320,
+      "influentialCitationCount": 89,
+      "referenceCount": 120
+    },
+    "pdfLink": "https://example.com/nlp-paper.pdf",
+    "link": "https://example.com/nlp-paper",
+    "semanticLink": "https://semantic.example.com/paper/98765432",
+    "journalName": "Journal of AI Research",
+    "publicationType": "JournalArticle",
+    "publishedAt": "2024-03-20T00:00:00Z",
+    "score": 0.98,
+    "tldr": "Advanced deep learning architectures for NLP applications",
+    "downloadable": true,
+    "isOpenAccess": true,
+    "isPrePrint": false
+  },
+  "citationNetwork": {
+    "nodes": [
+      {
+        "id": "corpus:98765432",
+        "label": "Deep Learning Architectures for Natural Language Processing",
+        "citations": 320,
+        "references": 120,
+        "isRoot": true,
+        "year": 2024,
+        "authors": "Sarah Chen, Michael Zhang, Lisa Wang",
+        "type": "root",
+        "score": 0.98,
+        "data": {
+          "id": "corpus:98765432",
+          "title": "Deep Learning Architectures for Natural Language Processing",
+          "authors": "Sarah Chen, Michael Zhang, Lisa Wang",
+          "year": 2024,
+          "fieldsOfStudy": ["Computer Science", "Natural Language Processing", "Machine Learning"],
+          "impactFactor": {
+            "citationCount": 320,
+            "referenceCount": 120
+          }
+        }
+      },
+      {
+        "id": "corpus:11111111",
+        "label": "Transformer Models: Architecture and Applications",
+        "citations": 450,
+        "references": 150,
+        "year": 2023,
+        "authors": "Alex Johnson, Maria Garcia",
+        "type": "citing",
+        "score": 0.96,
+        "data": {
+          "id": "corpus:11111111",
+          "title": "Transformer Models: Architecture and Applications",
+          "authors": "Alex Johnson, Maria Garcia",
+          "year": 2023,
+          "fieldsOfStudy": ["Computer Science", "Natural Language Processing"],
+          "impactFactor": {
+            "citationCount": 450,
+            "referenceCount": 150
+          }
+        }
+      },
+      {
+        "id": "corpus:22222222",
+        "label": "BERT: Pre-training of Deep Bidirectional Transformers",
+        "citations": 520,
+        "references": 180,
+        "year": 2022,
+        "authors": "Jacob Devlin, Ming-Wei Chang, Kenton Lee",
+        "type": "referenced",
+        "score": 0.97,
+        "data": {
+          "id": "corpus:22222222",
+          "title": "BERT: Pre-training of Deep Bidirectional Transformers",
+          "authors": "Jacob Devlin, Ming-Wei Chang, Kenton Lee",
+          "year": 2022,
+          "fieldsOfStudy": ["Computer Science", "Natural Language Processing"],
+          "impactFactor": {
+            "citationCount": 520,
+            "referenceCount": 180
+          }
+        }
+      },
+      {
+        "id": "corpus:33333333",
+        "label": "GPT Models: Scaling Laws and Emergent Abilities",
+        "citations": 380,
+        "references": 125,
+        "year": 2023,
+        "authors": "Tom Brown, Benjamin Mann",
+        "type": "both",
+        "score": 0.94,
+        "data": {
+          "id": "corpus:33333333",
+          "title": "GPT Models: Scaling Laws and Emergent Abilities",
+          "authors": "Tom Brown, Benjamin Mann",
+          "year": 2023,
+          "fieldsOfStudy": ["Computer Science", "Natural Language Processing"],
+          "impactFactor": {
+            "citationCount": 380,
+            "referenceCount": 125
+          }
+        }
+      },
+      {
+        "id": "corpus:44444444",
+        "label": "Attention Mechanisms in Neural Networks",
+        "citations": 600,
+        "references": 200,
+        "year": 2021,
+        "authors": "Vaswani Ashish, Noam Shazeer",
+        "type": "referenced",
+        "score": 0.99,
+        "data": {
+          "id": "corpus:44444444",
+          "title": "Attention Mechanisms in Neural Networks",
+          "authors": "Vaswani Ashish, Noam Shazeer",
+          "year": 2021,
+          "fieldsOfStudy": ["Computer Science", "Neural Networks"],
+          "impactFactor": {
+            "citationCount": 600,
+            "referenceCount": 200
+          }
+        }
+      },
+      {
+        "id": "corpus:55555555",
+        "label": "Multilingual Language Models: Challenges and Solutions",
+        "citations": 145,
+        "references": 72,
+        "year": 2024,
+        "authors": "Anna Schmidt, Peter Mueller",
+        "type": "citing",
+        "score": 0.89,
+        "data": {
+          "id": "corpus:55555555",
+          "title": "Multilingual Language Models: Challenges and Solutions",
+          "authors": "Anna Schmidt, Peter Mueller",
+          "year": 2024,
+          "fieldsOfStudy": ["Computer Science", "Natural Language Processing"],
+          "impactFactor": {
+            "citationCount": 145,
+            "referenceCount": 72
+          }
+        }
+      }
+    ],
+    "edges": [
+      {
+        "source": "corpus:11111111",
+        "target": "corpus:98765432",
+        "type": "cites",
+        "weight": 1.4,
+        "metadata": {
+          "sharedKeywords": ["Deep Learning", "Natural Language Processing"],
+          "sharedAuthors": [],
+          "similarityScore": 0.92,
+          "chatHistoryBoost": 0.0
+        }
+      },
+      {
+        "source": "corpus:55555555",
+        "target": "corpus:98765432",
+        "type": "cites",
+        "weight": 1.1,
+        "metadata": {
+          "sharedKeywords": ["Language Models"],
+          "sharedAuthors": [],
+          "similarityScore": 0.82,
+          "chatHistoryBoost": 0.0
+        }
+      },
+      {
+        "source": "corpus:98765432",
+        "target": "corpus:22222222",
+        "type": "references",
+        "weight": 1.5,
+        "metadata": {
+          "sharedKeywords": ["BERT", "Transformers"],
+          "sharedAuthors": [],
+          "similarityScore": 0.95,
+          "chatHistoryBoost": 0.0
+        }
+      },
+      {
+        "source": "corpus:98765432",
+        "target": "corpus:44444444",
+        "type": "references",
+        "weight": 1.6,
+        "metadata": {
+          "sharedKeywords": ["Attention Mechanisms"],
+          "sharedAuthors": [],
+          "similarityScore": 0.97,
+          "chatHistoryBoost": 0.0
+        }
+      },
+      {
+        "source": "corpus:98765432",
+        "target": "corpus:33333333",
+        "type": "references",
+        "weight": 1.3,
+        "metadata": {
+          "sharedKeywords": ["GPT", "Language Models"],
+          "sharedAuthors": [],
+          "similarityScore": 0.90,
+          "chatHistoryBoost": 0.0
+        }
+      },
+      {
+        "source": "corpus:33333333",
+        "target": "corpus:98765432",
+        "type": "cites",
+        "weight": 1.3,
+        "metadata": {
+          "sharedKeywords": ["GPT", "Language Models"],
+          "sharedAuthors": [],
+          "similarityScore": 0.90,
+          "chatHistoryBoost": 0.0
+        }
+      }
+    ],
+    "stats": {
+      "totalNodes": 6,
+      "totalEdges": 6,
+      "citingCount": 2,
+      "referencedCount": 3
+    }
+  },
+  "meta": {
+    "networkType": "citation",
+    "depth": 100,
+    "phrases": ["deep learning", "natural language processing", "transformers"],
+    "query": "Research related to Deep Learning Architectures for Natural Language Processing in fields: Computer Science, Natural Language Processing, Machine Learning",
+    "userInputs": {
+      "keywords": ["deep learning", "NLP"],
+      "authors": ["Sarah Chen"],
+      "references": []
+    },
+    "mode": "full",
+    "sortBy": "relevance"
+  },
+  "searchResults": [
+    {
+      "id": "corpus:11111111",
+      "title": "Transformer Models: Architecture and Applications",
+      "authors": "Alex Johnson, Maria Garcia",
+      "year": 2023,
+      "fieldsOfStudy": ["Computer Science", "Natural Language Processing"],
+      "impactFactor": {
+        "citationCount": 450,
+        "referenceCount": 150
+      },
+      "score": 0.96
+    },
+    {
+      "id": "corpus:55555555",
+      "title": "Multilingual Language Models: Challenges and Solutions",
+      "authors": "Anna Schmidt, Peter Mueller",
+      "year": 2024,
+      "fieldsOfStudy": ["Computer Science", "Natural Language Processing"],
+      "impactFactor": {
+        "citationCount": 145,
+        "referenceCount": 72
+      },
+      "score": 0.89
+    }
+  ]
+}
+

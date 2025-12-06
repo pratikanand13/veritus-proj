@@ -1,0 +1,33 @@
+{
+  "paper": {
+    "id": "corpus:98765432",
+    "title": "Deep Learning Architectures for Natural Language Processing",
+    "abstract": "This paper explores advanced deep learning architectures including transformers, BERT, and GPT models for natural language understanding and generation tasks.",
+    "authors": "Sarah Chen, Michael Zhang, Lisa Wang",
+    "doi": "10.5678/nlp.2024.045",
+    "year": 2024,
+    "fieldsOfStudy": ["Computer Science", "Natural Language Processing", "Machine Learning"],
+    "impactFactor": {
+      "citationCount": 320,
+      "influentialCitationCount": 89,
+      "referenceCount": 120
+    },
+    "pdfLink": "https://example.com/nlp-paper.pdf",
+    "link": "https://example.com/nlp-paper",
+    "semanticLink": "https://semantic.example.com/paper/98765432",
+    "journalName": "Journal of AI Research",
+    "publicationType": "JournalArticle",
+    "publishedAt": "2024-03-20T00:00:00Z",
+    "score": 0.98,
+    "tldr": "Advanced deep learning architectures for NLP applications",
+    "downloadable": true,
+    "isOpenAccess": true,
+    "isPrePrint": false,
+    "v_country": "USA",
+    "v_journal_name": "Journal of AI Research",
+    "v_publisher": "AI Publications",
+    "v_quartile_ranking": "Q1"
+  },
+  "message": "Paper found successfully"
+}
+

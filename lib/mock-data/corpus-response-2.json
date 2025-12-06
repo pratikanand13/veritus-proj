@@ -1,0 +1,160 @@
+{
+  "paper": {
+    "id": "corpus:98765432",
+    "title": "Deep Learning Architectures for Natural Language Processing",
+    "abstract": "This paper explores advanced deep learning architectures including transformers, BERT, and GPT models for natural language understanding and generation tasks.",
+    "authors": "Sarah Chen, Michael Zhang, Lisa Wang",
+    "doi": "10.5678/nlp.2024.045",
+    "year": 2024,
+    "fieldsOfStudy": ["Computer Science", "Natural Language Processing", "Machine Learning"],
+    "impactFactor": {
+      "citationCount": 320,
+      "influentialCitationCount": 89,
+      "referenceCount": 120
+    },
+    "pdfLink": "https://example.com/nlp-paper.pdf",
+    "link": "https://example.com/nlp-paper",
+    "semanticLink": "https://semantic.example.com/paper/98765432",
+    "journalName": "Journal of AI Research",
+    "publicationType": "JournalArticle",
+    "publishedAt": "2024-03-20T00:00:00Z",
+    "score": 0.98,
+    "tldr": "Advanced deep learning architectures for NLP applications",
+    "downloadable": true,
+    "isOpenAccess": true,
+    "isPrePrint": false
+  },
+  "similarPapers": [
+    {
+      "id": "corpus:11111111",
+      "title": "Transformer Models: Architecture and Applications",
+      "abstract": "Comprehensive analysis of transformer architecture and its applications in NLP.",
+      "authors": "Alex Johnson, Maria Garcia",
+      "doi": "10.5678/nlp.2024.046",
+      "year": 2024,
+      "fieldsOfStudy": ["Computer Science", "Natural Language Processing"],
+      "impactFactor": {
+        "citationCount": 280,
+        "influentialCitationCount": 75,
+        "referenceCount": 105
+      },
+      "pdfLink": "https://example.com/transformer.pdf",
+      "link": "https://example.com/transformer",
+      "semanticLink": "https://semantic.example.com/paper/11111111",
+      "journalName": "Journal of AI Research",
+      "publicationType": "JournalArticle",
+      "publishedAt": "2024-02-15T00:00:00Z",
+      "score": 0.96,
+      "tldr": "Transformer models architecture and applications",
+      "downloadable": true,
+      "isOpenAccess": true,
+      "isPrePrint": false
+    },
+    {
+      "id": "corpus:22222222",
+      "title": "BERT: Pre-training of Deep Bidirectional Transformers",
+      "abstract": "BERT model architecture and pre-training methodology for language understanding.",
+      "authors": "Jacob Devlin, Ming-Wei Chang, Kenton Lee",
+      "doi": "10.5678/nlp.2023.089",
+      "year": 2023,
+      "fieldsOfStudy": ["Computer Science", "Natural Language Processing", "Deep Learning"],
+      "impactFactor": {
+        "citationCount": 450,
+        "influentialCitationCount": 120,
+        "referenceCount": 150
+      },
+      "pdfLink": "https://example.com/bert.pdf",
+      "link": "https://example.com/bert",
+      "semanticLink": "https://semantic.example.com/paper/22222222",
+      "journalName": "ACL Journal",
+      "publicationType": "JournalArticle",
+      "publishedAt": "2023-08-20T00:00:00Z",
+      "score": 0.97,
+      "tldr": "BERT pre-training methodology",
+      "downloadable": true,
+      "isOpenAccess": true,
+      "isPrePrint": false
+    },
+    {
+      "id": "corpus:33333333",
+      "title": "GPT Models: Scaling Laws and Emergent Abilities",
+      "abstract": "Analysis of GPT model scaling and emergent capabilities in language generation.",
+      "authors": "Tom Brown, Benjamin Mann",
+      "doi": "10.5678/nlp.2023.090",
+      "year": 2023,
+      "fieldsOfStudy": ["Computer Science", "Natural Language Processing", "Large Language Models"],
+      "impactFactor": {
+        "citationCount": 380,
+        "influentialCitationCount": 95,
+        "referenceCount": 125
+      },
+      "pdfLink": "https://example.com/gpt.pdf",
+      "link": "https://example.com/gpt",
+      "semanticLink": "https://semantic.example.com/paper/33333333",
+      "journalName": "NeurIPS",
+      "publicationType": "ConferencePaper",
+      "publishedAt": "2023-12-10T00:00:00Z",
+      "score": 0.94,
+      "tldr": "GPT scaling laws and emergent abilities",
+      "downloadable": true,
+      "isOpenAccess": true,
+      "isPrePrint": false
+    },
+    {
+      "id": "corpus:44444444",
+      "title": "Attention Mechanisms in Neural Networks",
+      "abstract": "Comprehensive survey of attention mechanisms and their applications.",
+      "authors": "Vaswani Ashish, Noam Shazeer",
+      "doi": "10.5678/nlp.2022.156",
+      "year": 2022,
+      "fieldsOfStudy": ["Computer Science", "Neural Networks", "Attention Mechanisms"],
+      "impactFactor": {
+        "citationCount": 520,
+        "influentialCitationCount": 145,
+        "referenceCount": 180
+      },
+      "pdfLink": "https://example.com/attention.pdf",
+      "link": "https://example.com/attention",
+      "semanticLink": "https://semantic.example.com/paper/44444444",
+      "journalName": "NIPS",
+      "publicationType": "ConferencePaper",
+      "publishedAt": "2022-12-05T00:00:00Z",
+      "score": 0.99,
+      "tldr": "Attention mechanisms survey",
+      "downloadable": true,
+      "isOpenAccess": true,
+      "isPrePrint": false
+    },
+    {
+      "id": "corpus:55555555",
+      "title": "Multilingual Language Models: Challenges and Solutions",
+      "abstract": "Exploring challenges in building multilingual language models.",
+      "authors": "Anna Schmidt, Peter Mueller",
+      "doi": "10.5678/nlp.2024.047",
+      "year": 2024,
+      "fieldsOfStudy": ["Computer Science", "Natural Language Processing", "Multilingual NLP"],
+      "impactFactor": {
+        "citationCount": 145,
+        "influentialCitationCount": 38,
+        "referenceCount": 72
+      },
+      "pdfLink": "https://example.com/multilingual.pdf",
+      "link": "https://example.com/multilingual",
+      "semanticLink": "https://semantic.example.com/paper/55555555",
+      "journalName": "Computational Linguistics",
+      "publicationType": "JournalArticle",
+      "publishedAt": "2024-01-25T00:00:00Z",
+      "score": 0.89,
+      "tldr": "Multilingual language models challenges",
+      "downloadable": true,
+      "isOpenAccess": true,
+      "isPrePrint": false
+    }
+  ],
+  "meta": {
+    "phrases": ["deep learning", "natural language processing", "transformers"],
+    "query": "Research related to Deep Learning Architectures for Natural Language Processing in fields: Computer Science, Natural Language Processing, Machine Learning",
+    "depth": 50
+  }
+}
+
