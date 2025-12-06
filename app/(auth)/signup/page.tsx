@@ -76,26 +76,26 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#0f0f0f] px-4">
-      <Card className="w-full max-w-md bg-[#1f1f1f] border-[#2a2a2a]">
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-white text-center">
+          <CardTitle className="text-lg font-semibold text-center">
             Sign Up
           </CardTitle>
-          <CardDescription className="text-gray-400 text-center">
+          <CardDescription className="text-center">
             Create an account with your academic email
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="p-3 text-sm text-red-400 bg-red-900/20 border border-red-800 rounded-md">
+              <div className="p-3 text-sm text-destructive-foreground bg-destructive/20 border border-destructive rounded-sm">
                 {error}
               </div>
             )}
             
             <div className="space-y-2">
-              <label htmlFor="name" className="text-sm font-medium text-gray-300">
+              <label htmlFor="name" className="text-sm font-medium text-foreground">
                 Name
               </label>
               <Input
@@ -106,12 +106,11 @@ export default function SignupPage() {
                 value={formData.name}
                 onChange={handleChange}
                 required
-                className="bg-[#171717] border-[#2a2a2a] text-white placeholder:text-gray-500"
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-gray-300">
+              <label htmlFor="email" className="text-sm font-medium text-foreground">
                 Academic Email
               </label>
               <Input
@@ -122,15 +121,14 @@ export default function SignupPage() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="bg-[#171717] border-[#2a2a2a] text-white placeholder:text-gray-500"
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">
                 Only academic email addresses (IIT, NIT, IIIT) are allowed
               </p>
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="areaOfInterest" className="text-sm font-medium text-gray-300">
+              <label htmlFor="areaOfInterest" className="text-sm font-medium text-foreground">
                 Area of Interest
               </label>
               <Input
@@ -141,12 +139,11 @@ export default function SignupPage() {
                 value={formData.areaOfInterest}
                 onChange={handleChange}
                 required
-                className="bg-[#171717] border-[#2a2a2a] text-white placeholder:text-gray-500"
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium text-gray-300">
+              <label htmlFor="password" className="text-sm font-medium text-foreground">
                 Password
               </label>
               <Input
@@ -158,21 +155,20 @@ export default function SignupPage() {
                 onChange={handleChange}
                 required
                 minLength={6}
-                className="bg-[#171717] border-[#2a2a2a] text-white placeholder:text-gray-500"
               />
             </div>
 
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#2a2a2a] hover:bg-[#3a3a3a] text-white"
+              className="w-full"
             >
               {loading ? 'Creating account...' : 'Sign Up'}
             </Button>
 
-            <div className="text-center text-sm text-gray-400">
+            <div className="text-center text-sm text-muted-foreground">
               Already have an account?{' '}
-              <Link href="/login" className="text-blue-400 hover:text-blue-300">
+              <Link href="/login" className="text-primary hover:underline font-medium">
                 Login
               </Link>
             </div>

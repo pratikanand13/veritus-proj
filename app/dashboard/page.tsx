@@ -8,7 +8,6 @@ import { ProjectList } from '@/components/dashboard/ProjectList'
 import { ChatInterface } from '@/components/dashboard/ChatInterface'
 import { Header } from '@/components/dashboard/Header'
 import { PaperSearchPage } from '@/components/dashboard/PaperSearchPage'
-import { HistorySidebar } from '@/components/dashboard/HistorySidebar'
 import { shouldUseMockData } from '@/lib/config/mock-config'
 
 interface User {
@@ -611,8 +610,11 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0f0f0f]">
-        <div className="text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-12 w-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+          <div className="text-foreground text-base font-medium">Loading...</div>
+        </div>
       </div>
     )
   }
@@ -791,31 +793,6 @@ export default function DashboardPage() {
                 />
               )}
             </div>
-            
-            {/* Right Sidebar - History */}
-            {selectedChat && (
-              <div className="flex-shrink-0 w-80">
-                <HistorySidebar
-                  items={chats
-                    .filter(chat => chat.projectId === selectedProject)
-                    .map(chat => ({
-                      id: chat.id,
-                      title: chat.title,
-                      preview: chat.messages?.[0]?.content?.substring(0, 100) || 'No messages yet',
-                      category: chat.isFavorite ? 'Favorites' : undefined,
-                      checked: chat.id === selectedChat,
-                    }))}
-                  onItemClick={(itemId) => {
-                    setSelectedChat(itemId)
-                    loadChatMessages(itemId)
-                  }}
-                  onClearHistory={() => {
-                    // Clear history logic
-                    console.log('Clear history')
-                  }}
-                />
-              </div>
-            )}
           </div>
         </div>
       </SidebarInset>

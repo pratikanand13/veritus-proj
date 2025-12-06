@@ -60,41 +60,41 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
-      <Card className="w-full max-w-md bg-[#1f1f1f] border-[#2a2a2a] shadow-xl">
+      <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           {/* Logo/Branding */}
           <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#FF6B35] text-white">
+            <div className="flex h-12 w-12 items-center justify-center rounded-sm bg-primary text-primary-foreground">
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
             <div>
-              <CardTitle className="text-2xl font-bold text-white">
+              <CardTitle className="text-xl font-semibold">
                 Research Hub
               </CardTitle>
-              <CardDescription className="text-gray-400 text-xs">
+              <CardDescription className="text-xs">
                 Academic Papers Platform
               </CardDescription>
             </div>
           </div>
-          <CardTitle className="text-xl font-semibold text-white text-center">
+          <CardTitle className="text-lg font-semibold text-center">
             Welcome Back
           </CardTitle>
-          <CardDescription className="text-gray-400 text-center">
+          <CardDescription className="text-center">
             Enter your academic email to continue
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="p-3 text-sm text-red-400 bg-red-900/20 border border-red-800 rounded-md">
+              <div className="p-3 text-sm text-destructive-foreground bg-destructive/20 border border-destructive rounded-sm">
                 {error}
               </div>
             )}
             
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-gray-300">
+              <label htmlFor="email" className="text-sm font-medium text-foreground">
                 Email
               </label>
               <Input
@@ -104,12 +104,11 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="bg-[#171717] border-[#2a2a2a] text-white placeholder:text-gray-500 focus-visible:ring-[#FF6B35] focus-visible:border-[#FF6B35]"
               />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium text-gray-300">
+              <label htmlFor="password" className="text-sm font-medium text-foreground">
                 Password
               </label>
               <Input
@@ -119,21 +118,20 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="bg-[#171717] border-[#2a2a2a] text-white placeholder:text-gray-500 focus-visible:ring-[#FF6B35] focus-visible:border-[#FF6B35]"
               />
             </div>
 
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#FF6B35] hover:bg-[#FF8555] text-white font-medium"
+              className="w-full"
             >
               {loading ? 'Logging in...' : 'Login'}
             </Button>
 
-            <div className="text-center text-sm text-gray-400">
+            <div className="text-center text-sm text-muted-foreground">
               Don't have an account?{' '}
-              <Link href="/signup" className="text-[#FF6B35] hover:text-[#FF8555] font-medium">
+              <Link href="/signup" className="text-primary hover:underline font-medium">
                 Sign up
               </Link>
             </div>
