@@ -26,7 +26,7 @@ export function PaperSearchResults({
 
   if (papers.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-400">
+      <div className="text-center py-8 text-muted-foreground">
         <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
         <p>No papers found. Try a different search.</p>
       </div>
@@ -36,7 +36,7 @@ export function PaperSearchResults({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-400">
+        <div className="text-sm text-muted-foreground">
           {selectedPapers.length} of {papers.length} papers selected
         </div>
         <div className="flex gap-2">
@@ -44,7 +44,7 @@ export function PaperSearchResults({
             variant="outline"
             size="sm"
             onClick={onSelectAll}
-            className="border-[#2a2a2a] text-gray-300 text-xs"
+            className="text-xs"
           >
             Select All
           </Button>
@@ -52,7 +52,7 @@ export function PaperSearchResults({
             variant="outline"
             size="sm"
             onClick={onDeselectAll}
-            className="border-[#2a2a2a] text-gray-300 text-xs"
+            className="text-xs"
           >
             Deselect All
           </Button>
@@ -63,8 +63,8 @@ export function PaperSearchResults({
         {papers.map((paper) => (
           <Card
             key={paper.id}
-            className={`bg-[#1f1f1f] border-[#2a2a2a] hover:border-[#3a3a3a] transition-colors ${
-              selectedPapers.includes(paper.id) ? 'border-blue-500' : ''
+            className={`hover:shadow-md transition-all ${
+              selectedPapers.includes(paper.id) ? 'border-primary' : ''
             }`}
           >
             <CardHeader className="pb-3">
@@ -75,20 +75,20 @@ export function PaperSearchResults({
                   className="mt-1"
                 />
                 <div className="flex-1">
-                  <CardTitle className="text-white text-base mb-2 line-clamp-2">
+                  <CardTitle className="text-base mb-2 line-clamp-2">
                     {paper.title}
                   </CardTitle>
-                  <CardDescription className="text-gray-400 text-sm mb-2">
+                  <CardDescription className="text-sm mb-2">
                     {paper.authors}
                   </CardDescription>
-                  <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                     {paper.year && <span>{paper.year}</span>}
                     {paper.journalName && <span>• {paper.journalName}</span>}
                     {paper.impactFactor && (
                       <span>• {paper.impactFactor.citationCount} citations</span>
                     )}
                     {paper.isOpenAccess && (
-                      <span className="text-green-400">• Open Access</span>
+                      <span className="text-primary">• Open Access</span>
                     )}
                   </div>
                 </div>
@@ -98,10 +98,10 @@ export function PaperSearchResults({
                       href={paper.pdfLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 hover:bg-[#2a2a2a] rounded"
+                      className="p-2 hover:bg-accent rounded-sm transition-colors"
                       title="Download PDF"
                     >
-                      <Download className="h-4 w-4 text-gray-400" />
+                      <Download className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                     </a>
                   )}
                   {paper.link && (
@@ -109,10 +109,10 @@ export function PaperSearchResults({
                       href={paper.link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 hover:bg-[#2a2a2a] rounded"
+                      className="p-2 hover:bg-accent rounded-sm transition-colors"
                       title="View paper"
                     >
-                      <ExternalLink className="h-4 w-4 text-gray-400" />
+                      <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                     </a>
                   )}
                 </div>
@@ -122,12 +122,12 @@ export function PaperSearchResults({
               <CardContent className="pt-0">
                 <button
                   onClick={() => setExpandedPaper(expandedPaper === paper.id ? null : paper.id)}
-                  className="text-xs text-blue-400 hover:text-blue-300"
+                  className="text-xs text-primary hover:underline"
                 >
                   {expandedPaper === paper.id ? 'Hide' : 'Show'} {paper.tldr ? 'TLDR' : 'Abstract'}
                 </button>
                 {expandedPaper === paper.id && (
-                  <div className="mt-2 text-sm text-gray-300">
+                  <div className="mt-2 text-sm text-card-foreground">
                     {paper.tldr ? (
                       <p className="italic">{paper.tldr}</p>
                     ) : (

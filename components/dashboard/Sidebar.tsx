@@ -188,15 +188,15 @@ export function Sidebar({
   }
 
   return (
-    <ShadcnSidebar collapsible="icon" variant="sidebar">
+    <ShadcnSidebar collapsible="none" variant="sidebar">
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex flex-col gap-3 px-2 py-2">
           {/* App Logo/Branding */}
           <div className="flex items-center gap-2 px-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#FF6B35] text-white">
+            <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-primary text-primary-foreground">
               <Sparkles className="h-4 w-4" />
             </div>
-            <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+            <div className="flex flex-col">
               <span className="text-sm font-semibold text-sidebar-foreground">Research Hub</span>
               <span className="text-xs text-sidebar-foreground/70">Academic Papers</span>
             </div>
@@ -556,14 +556,14 @@ export function Sidebar({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton className="w-full" tooltip={user.name}>
-                    <div className="flex h-8 w-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-sidebar-primary text-sidebar-primary-foreground">
                       <User className="h-4 w-4" />
                     </div>
-                    <div className="flex flex-col items-start group-data-[collapsible=icon]:hidden">
+                    <div className="flex flex-col items-start">
                       <span className="text-sm font-medium text-sidebar-foreground">{user.name}</span>
                       <span className="text-xs text-sidebar-foreground/70 truncate max-w-[140px]">{user.email}</span>
                     </div>
-                    <ChevronUp className="ml-auto h-4 w-4 group-data-[collapsible=icon]:hidden" />
+                    <ChevronUp className="ml-auto h-4 w-4" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent side="top" align="end" className="w-56">

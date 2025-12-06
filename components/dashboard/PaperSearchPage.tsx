@@ -423,30 +423,30 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-[#0f0f0f] overflow-hidden">
+    <div className="flex-1 flex flex-col bg-background overflow-hidden">
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto w-full p-6 space-y-6">
+        <div className="max-w-4xl mx-auto w-full p-4 space-y-4">
         {/* Header */}
         <div className="text-center space-y-3">
           <div className="flex items-center justify-center gap-3">
-            <FileText className="h-8 w-8 text-[#FF6B35]" />
-            <h1 className="text-4xl font-bold text-white">Paper Search</h1>
+            <FileText className="h-8 w-8 text-green-500" />
+            <h1 className="text-3xl font-semibold text-foreground">Paper Search</h1>
           </div>
-          <p className="text-gray-400 text-lg">Search for academic papers by title or corpus ID</p>
+          <p className="text-muted-foreground text-base">Search for academic papers by title or corpus ID</p>
         </div>
 
         {/* Chat Selection Info */}
         {projectId && (
-          <Card className="bg-gradient-to-r from-[#1f1f1f] to-[#2a2a2a] border-[#2a2a2a]">
+          <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <MessageSquare className="h-5 w-5 text-[#FF6B35]" />
-                  <div className="text-sm text-gray-300">
+                  <MessageSquare className="h-5 w-5 text-green-500" />
+                  <div className="text-sm text-card-foreground">
                     {chatId ? (
                       <span>Results will be saved to the current chat</span>
                     ) : (
-                      <span className="text-gray-400">Click on any paper to open a chat window</span>
+                      <span className="text-muted-foreground">Click on any paper to open a chat window</span>
                     )}
                   </div>
                 </div>
@@ -457,9 +457,9 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                       id="saveToChat"
                       checked={saveToChat}
                       onChange={(e) => setSaveToChat(e.target.checked)}
-                      className="w-4 h-4 rounded text-[#FF6B35]"
+                      className="w-4 h-4 rounded text-green-500"
                     />
-                    <label htmlFor="saveToChat" className="text-sm text-gray-300 cursor-pointer">
+                    <label htmlFor="saveToChat" className="text-sm text-card-foreground cursor-pointer">
                       Save to chat
                     </label>
                   </div>
@@ -472,13 +472,13 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
         {/* Search Forms */}
         <div className="grid md:grid-cols-2 gap-4">
           {/* Title Search */}
-          <Card className="bg-[#1f1f1f] border-[#2a2a2a]">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <FileText className="h-5 w-5" />
                 Search by Title
               </CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardDescription>
                 Find papers by entering the paper title
               </CardDescription>
             </CardHeader>
@@ -490,12 +490,11 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                   value={titleQuery}
                   onChange={(e) => setTitleQuery(e.target.value)}
                   disabled={loading}
-                    className="bg-[#171717] border-[#2a2a2a] text-white placeholder:text-gray-500 focus-visible:ring-[#FF6B35] focus-visible:border-[#FF6B35]"
                 />
                 <Button
                   type="submit"
                   disabled={loading || !titleQuery.trim()}
-                  className="w-full bg-[#FF6B35] hover:bg-[#FF8555] text-white"
+                  className="w-full"
                 >
                   {loading ? (
                     <>
@@ -514,13 +513,13 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
           </Card>
 
           {/* Corpus ID Search */}
-          <Card className="bg-[#1f1f1f] border-[#2a2a2a]">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2">
                 <Search className="h-5 w-5" />
                 Search by Corpus ID
               </CardTitle>
-              <CardDescription className="text-gray-400">
+              <CardDescription>
                 Find papers by entering the corpus ID
               </CardDescription>
             </CardHeader>
@@ -532,12 +531,11 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                   value={corpusIdQuery}
                   onChange={(e) => setCorpusIdQuery(e.target.value)}
                   disabled={loading}
-                    className="bg-[#171717] border-[#2a2a2a] text-white placeholder:text-gray-500 focus-visible:ring-[#FF6B35] focus-visible:border-[#FF6B35]"
                 />
                 <Button
                   type="submit"
                   disabled={loading || !corpusIdQuery.trim()}
-                  className="w-full bg-[#FF6B35] hover:bg-[#FF8555] text-white"
+                  className="w-full"
                 >
                   {loading ? (
                     <>
@@ -567,7 +565,7 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
 
         {/* Loading State for Search */}
         {loading && !searchResult && (
-          <Card className="bg-[#1f1f1f] border-[#2a2a2a]">
+          <Card>
             <CardHeader>
               <Skeleton className="h-6 w-3/4 mb-2" />
               <Skeleton className="h-4 w-1/2" />
@@ -584,35 +582,35 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
 
         {/* Search Result */}
         {searchResult && (
-          <Card className="bg-[#1f1f1f] border-[#2a2a2a] hover:border-blue-500/50 transition-colors">
+          <Card className="hover:shadow-md transition-all">
             <CardHeader>
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
-                  <CardTitle className="text-white text-xl mb-3 cursor-pointer hover:text-[#FF6B35] transition-colors" onClick={() => handlePaperClick(searchResult.paper)}>
+                    <CardTitle className="text-xl mb-3 cursor-pointer hover:text-primary transition-colors" onClick={() => handlePaperClick(searchResult.paper)}>
                     {searchResult.paper.title}
                   </CardTitle>
-                  <CardDescription className="text-gray-400 mb-3 flex items-center gap-2">
+                  <CardDescription className="mb-3 flex items-center gap-2">
                     <Users className="h-4 w-4" />
                     {searchResult.paper.authors}
                   </CardDescription>
                   <div className="flex flex-wrap gap-2 items-center">
                     {searchResult.paper.year && (
-                      <Badge variant="outline" className="text-gray-300 border-gray-600">
+                      <Badge variant="outline">
                         {searchResult.paper.year}
                       </Badge>
                     )}
                     {searchResult.paper.journalName && (
-                      <Badge variant="outline" className="text-gray-300 border-gray-600">
+                      <Badge variant="outline">
                         {searchResult.paper.journalName}
                       </Badge>
                     )}
                     {searchResult.paper.impactFactor && (
-                      <Badge variant="outline" className="text-blue-300 border-blue-600">
+                      <Badge variant="outline">
                         {searchResult.paper.impactFactor.citationCount} citations
                       </Badge>
                     )}
                     {searchResult.paper.isOpenAccess && (
-                      <Badge className="bg-green-600/20 text-green-400 border-green-500/50">
+                      <Badge variant="green">
                         Open Access
                       </Badge>
                     )}
@@ -623,7 +621,6 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                     variant="ghost"
                     size="sm"
                     onClick={handleClear}
-                    className="text-gray-400 hover:text-white"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -631,7 +628,6 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                     variant="outline"
                     size="sm"
                     onClick={() => handlePaperClick(searchResult.paper)}
-                    className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
                     title="Open in chat"
                   >
                     <MessageSquare className="h-4 w-4" />
@@ -642,32 +638,32 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
             <CardContent className="space-y-4">
               {searchResult.paper.abstract && (
                 <div>
-                  <h4 className="text-white font-medium mb-2 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-gray-400" />
+                  <h4 className="text-foreground font-medium mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
                     Abstract
                   </h4>
-                  <p className="text-gray-300 text-sm leading-relaxed">
+                  <p className="text-card-foreground text-sm leading-relaxed">
                     {searchResult.paper.abstract}
                   </p>
                 </div>
               )}
               {searchResult.paper.tldr && (
                 <div>
-                  <h4 className="text-white font-medium mb-2 flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-yellow-400" />
+                  <h4 className="text-foreground font-medium mb-2 flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
                     TLDR
                   </h4>
-                  <p className="text-gray-300 text-sm italic bg-[#171717] p-3 rounded border-l-2 border-yellow-500/50">
+                  <p className="text-card-foreground text-sm italic bg-muted p-3 rounded-sm border-l-2 border-primary/50">
                     {searchResult.paper.tldr}
                   </p>
                 </div>
               )}
               {searchResult.paper.fieldsOfStudy && searchResult.paper.fieldsOfStudy.length > 0 && (
                 <div>
-                  <h4 className="text-white font-medium mb-2">Fields of Study</h4>
+                  <h4 className="text-foreground font-medium mb-2">Fields of Study</h4>
                   <div className="flex flex-wrap gap-2">
                     {searchResult.paper.fieldsOfStudy.map((field, idx) => (
-                      <Badge key={idx} className="bg-blue-600/20 text-blue-300 border-blue-500/50">
+                      <Badge key={idx} variant="outline">
                         {field}
                       </Badge>
                     ))}
@@ -680,7 +676,7 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                     href={searchResult.paper.pdfLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-sm transition-colors"
                   >
                     <ExternalLink className="h-4 w-4" />
                     View PDF
@@ -691,7 +687,7 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                     href={searchResult.paper.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#2a2a2a] hover:bg-[#3a3a3a] text-white text-sm rounded transition-colors"
+                    className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-sm transition-colors"
                   >
                     <ExternalLink className="h-4 w-4" />
                     View Paper
@@ -700,7 +696,7 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                 {searchResult.paper.id && (
                   <Button
                     onClick={() => setShowCitationNetworkSelector(true)}
-                    className="bg-[#FF6B35] hover:bg-[#FF8555] text-white"
+                    className=""
                   >
                     <Network className="h-4 w-4 mr-2" />
                     Generate Citation Graph
@@ -710,7 +706,7 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
               {loadingCorpus && (
                 <div className="mt-4 space-y-3">
                   {Array.from({ length: 3 }).map((_, idx) => (
-                    <Card key={idx} className="bg-[#171717] border-[#2a2a2a]">
+                    <Card key={idx}>
                       <CardHeader className="pb-3">
                         <Skeleton className="h-5 w-3/4 mb-2" />
                         <Skeleton className="h-4 w-1/2" />
@@ -729,14 +725,14 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
 
         {/* Similar Papers Result */}
         {corpusResult && (
-          <Card className="bg-[#1f1f1f] border-[#2a2a2a]">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Users className="h-5 w-5 text-green-400" />
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
                 Similar Papers ({corpusResult.similarPapers.length})
               </CardTitle>
               {corpusResult.meta && (
-                <CardDescription className="text-gray-400">
+                <CardDescription>
                   Query: {corpusResult.meta.query} • Depth: {corpusResult.meta.depth}
                 </CardDescription>
               )}
@@ -746,32 +742,32 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                 {corpusResult.similarPapers.map((paper, idx) => (
                   <Card
                     key={paper.id || idx}
-                    className="bg-[#171717] border-[#2a2a2a] hover:border-[#FF6B35]/50 transition-all cursor-pointer group"
+                    className="hover:shadow-md transition-all cursor-pointer group"
                     onClick={() => handlePaperClick(paper)}
                   >
                     <CardHeader className="pb-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
-                          <CardTitle className="text-white text-base mb-2 line-clamp-2 group-hover:text-[#FF6B35] transition-colors">
+                          <CardTitle className="text-base mb-2 line-clamp-2 group-hover:text-primary transition-colors">
                             {paper.title}
                           </CardTitle>
-                          <CardDescription className="text-gray-400 text-sm mb-2 flex items-center gap-1">
+                          <CardDescription className="text-sm mb-2 flex items-center gap-1">
                             <Users className="h-3 w-3" />
                             {paper.authors}
                           </CardDescription>
                           <div className="flex flex-wrap gap-2 items-center">
                             {paper.year && (
-                              <Badge variant="outline" className="text-xs text-gray-400 border-gray-600">
+                              <Badge variant="outline" className="text-xs">
                                 {paper.year}
                               </Badge>
                             )}
                             {paper.journalName && (
-                              <Badge variant="outline" className="text-xs text-gray-400 border-gray-600">
+                              <Badge variant="outline" className="text-xs">
                                 {paper.journalName}
                               </Badge>
                             )}
                             {paper.impactFactor && (
-                              <Badge variant="outline" className="text-xs text-blue-300 border-blue-600">
+                              <Badge variant="outline" className="text-xs">
                                 {paper.impactFactor.citationCount} citations
                               </Badge>
                             )}
@@ -802,7 +798,7 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                     </CardHeader>
                     {paper.tldr && (
                       <CardContent className="pt-0">
-                        <p className="text-gray-300 text-sm italic line-clamp-2 bg-[#0f0f0f] p-2 rounded">
+                        <p className="text-card-foreground text-sm italic line-clamp-2 bg-muted p-2 rounded-sm">
                           {paper.tldr}
                         </p>
                       </CardContent>
@@ -816,32 +812,32 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
 
         {/* Citation Network Loading Skeleton */}
         {loadingCitationNetwork && !citationNetworkResponse && (
-          <Card className="bg-[#1f1f1f] border-[#2a2a2a]">
+          <Card>
             <CardHeader>
               <Skeleton className="h-6 w-48 mb-2" />
               <Skeleton className="h-4 w-32" />
             </CardHeader>
             <CardContent>
-              <Skeleton className="h-[600px] w-full rounded-md" />
+              <Skeleton className="h-[600px] w-full rounded-sm" />
             </CardContent>
           </Card>
         )}
 
         {/* Citation Network Graph */}
         {citationNetworkResponse && (
-          <Card className="bg-[#1f1f1f] border-[#2a2a2a]">
+          <Card>
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Network className="h-5 w-5 text-purple-400" />
+              <CardTitle className="flex items-center gap-2">
+                <Network className="h-5 w-5 text-primary" />
                 Citation Network
                 {citationNetworkResponse.meta?.mode && (
-                  <Badge className="ml-2 bg-purple-600/20 text-purple-300 border-purple-500/50">
+                  <Badge variant="outline" className="ml-2">
                     {citationNetworkResponse.meta.mode === 'simple' ? 'Simple Mode' : 'Full Mode'}
                   </Badge>
                 )}
               </CardTitle>
               {citationNetworkResponse.citationNetwork?.stats && (
-                <CardDescription className="text-gray-400">
+                <CardDescription>
                   {citationNetworkResponse.citationNetwork.stats.totalNodes} nodes • {citationNetworkResponse.citationNetwork.stats.totalEdges} edges
                 </CardDescription>
               )}
@@ -879,11 +875,11 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
         {/* Empty State */}
         {!searchResult && !error && (
           <div className="text-center py-12">
-            <FileText className="h-16 w-16 mx-auto mb-4 text-gray-600" />
-            <h3 className="text-xl font-semibold text-white mb-2">
+            <FileText className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+            <h3 className="text-xl font-semibold text-foreground mb-2">
               Start Your Search
             </h3>
-            <p className="text-gray-400">
+            <p className="text-muted-foreground">
               Use the search forms above to find academic papers
             </p>
           </div>

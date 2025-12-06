@@ -23,39 +23,39 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
+    --radius: 1rem; /* Larger radius like GoTrade */
   }
 
   .dark {
-    --background: 15 15 15; /* #0f0f0f */
-    --foreground: 210 40% 98%;
-    --card: 31 31 31; /* #1f1f1f */
-    --card-foreground: 210 40% 98%;
-    --popover: 31 31 31;
-    --popover-foreground: 210 40% 98%;
-    --primary: 255 107 53; /* Orange #FF6B35 */
-    --primary-foreground: 255 255 255;
-    --secondary: 42 42 42; /* #2a2a2a */
-    --secondary-foreground: 210 40% 98%;
-    --muted: 42 42 42;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 255 107 53; /* Orange accent */
-    --accent-foreground: 255 255 255;
+    --background: 0 0% 7%; /* Very dark background like GoTrade */
+    --foreground: 0 0% 95%;
+    --card: 180 11% 9%; /* Dark teal-gray card background */
+    --card-foreground: 0 0% 95%;
+    --popover: 180 11% 9%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 160 84% 39%; /* Green #10B981 */
+    --primary-foreground: 0 0% 0%;
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 15%;
+    --muted-foreground: 240 5% 64.9%;
+    --accent: 12 6.5% 15.1%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 42 42 42; /* #2a2a2a */
-    --input: 23 23 23; /* #171717 */
-    --ring: 255 107 53; /* Orange ring */
+    --destructive-foreground: 0 85.7% 97.3%;
+    --border: 180 7% 14%; /* Subtle border like GoTrade */
+    --input: 240 4% 100%;
+    --ring: 160 84% 39%; /* Green ring */
     
     /* Sidebar variables */
-    --sidebar: 31 31 31; /* #1f1f1f */
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 255 107 53; /* Orange */
-    --sidebar-primary-foreground: 255 255 255;
-    --sidebar-accent: 42 42 42;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 42 42 42;
-    --sidebar-ring: 255 107 53;
+    --sidebar: 180 11% 9%; /* Match card background */
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 160 84% 39%; /* Green */
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 12 6.5% 15.1%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 180 7% 14%;
+    --sidebar-ring: 160 84% 39%;
   }
 }
 
@@ -73,15 +73,15 @@
   }
 
   .dark {
-    /* Enhanced dark mode sidebar variables for better contrast */
-    --sidebar: 31 31 31; /* #1f1f1f */
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 255 107 53; /* Orange */
-    --sidebar-primary-foreground: 255 255 255;
-    --sidebar-accent: 42 42 42;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 42 42 42;
-    --sidebar-ring: 255 107 53;
+    /* Enhanced dark mode sidebar variables matching GoTrade style */
+    --sidebar: 180 11% 9%; /* Match card background */
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 160 84% 39%; /* Green */
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 12 6.5% 15.1%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 180 7% 14%;
+    --sidebar-ring: 160 84% 39%;
   }
 }
 
@@ -91,34 +91,27 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* MindMerge gradient background */
-    background: 
-      radial-gradient(circle at top right, rgba(255, 107, 53, 0.15) 0%, transparent 50%),
-      radial-gradient(circle at bottom left, rgba(255, 20, 147, 0.15) 0%, transparent 50%),
-      #0f0f0f;
-    background-attachment: fixed;
+    /* Clean minimal background - no heavy gradients */
+    background-color: hsl(var(--background));
   }
 }
 
-/* MindMerge Design System */
+/* Clean Design System - GoTrade Inspired */
 @layer utilities {
   .gradient-bg {
-    background: 
-      radial-gradient(circle at top right, rgba(255, 107, 53, 0.15) 0%, transparent 50%),
-      radial-gradient(circle at bottom left, rgba(255, 20, 147, 0.15) 0%, transparent 50%),
-      #0f0f0f;
+    background-color: hsl(var(--background));
   }
   
-  .orange-accent {
-    color: #FF6B35;
+  .green-accent {
+    color: hsl(var(--primary));
   }
   
-  .bg-orange-accent {
-    background-color: #FF6B35;
+  .bg-green-accent {
+    background-color: hsl(var(--primary));
   }
   
-  .border-orange-accent {
-    border-color: #FF6B35;
+  .border-green-accent {
+    border-color: hsl(var(--primary));
   }
 }
 

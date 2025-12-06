@@ -245,12 +245,12 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
 
   if (!chatId) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-[#0f0f0f]">
+      <div className="flex-1 flex items-center justify-center bg-background">
         <div className="text-center">
-          <h2 className="text-2xl font-semibold text-white mb-2">
+          <h2 className="text-xl font-semibold text-foreground mb-2">
             What's on the agenda today?
           </h2>
-          <p className="text-gray-400">Select a chat or create a new one to get started</p>
+          <p className="text-muted-foreground">Select a chat or create a new one to get started</p>
         </div>
       </div>
     )
@@ -260,9 +260,9 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* Paper Search Section */}
       {showPaperSearch && (
-        <div className="border-b border-[#2a2a2a] p-4 bg-[#171717]">
+        <div className="border-b border-border p-4 bg-card">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-white font-medium flex items-center gap-2">
+            <h3 className="text-foreground font-medium flex items-center gap-2">
               <FileText className="h-4 w-4" />
               Paper Search
             </h3>
@@ -275,7 +275,7 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
                 setSelectedPapers([])
                 setSearchError('')
               }}
-              className="text-gray-400 hover:text-white"
+              className="text-muted-foreground hover:text-foreground"
             >
               Close
             </Button>
@@ -287,7 +287,7 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
           />
 
           {searchError && (
-            <div className="mt-3 p-3 text-sm text-red-400 bg-red-900/20 border border-red-800 rounded-md">
+            <div className="mt-3 p-3 text-sm text-destructive-foreground bg-destructive/20 border border-destructive rounded-sm">
               {searchError}
             </div>
           )}
@@ -305,7 +305,7 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
                 <div className="mt-4 flex justify-end">
                   <Button
                     onClick={handleVisualizeNetwork}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className=""
                   >
                     <Network className="mr-2 h-4 w-4" />
                     Visualize Citation Network ({selectedPapers.length})
@@ -318,13 +318,13 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
       )}
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {loadingMessages ? (
           <MessagesSkeleton />
         ) : messages.length === 0 && !showNetwork ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
-              <h2 className="text-2xl font-semibold text-white mb-2">
+              <h2 className="text-xl font-semibold text-foreground mb-2">
                 What's on the agenda today?
               </h2>
             </div>
@@ -339,43 +339,43 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
                   }`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-lg px-4 py-3 ${
+                    className={`max-w-[80%] rounded-xl px-4 py-3 ${
                       message.role === 'user'
-                        ? 'bg-[#2a2a2a] text-white'
-                        : 'bg-[#1f1f1f] text-gray-300 border border-[#2a2a2a]'
+                        ? 'bg-secondary text-secondary-foreground'
+                        : 'bg-card text-card-foreground border border-border'
                     }`}
                   >
                     <p className="whitespace-pre-wrap">{message.content}</p>
                     
                     {/* Feedback buttons for assistant messages */}
                     {message.role === 'assistant' && (
-                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-[#2a2a2a]">
+                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
                         <button
-                          className="p-1.5 hover:bg-[#2a2a2a] rounded transition-colors"
+                          className="p-1.5 hover:bg-accent rounded-sm transition-colors"
                           title="Thumbs up"
                         >
-                          <ThumbsUp className="h-4 w-4 text-gray-400 hover:text-[#FF6B35]" />
+                          <ThumbsUp className="h-4 w-4 text-muted-foreground hover:text-primary" />
                         </button>
                         <button
-                          className="p-1.5 hover:bg-[#2a2a2a] rounded transition-colors"
+                          className="p-1.5 hover:bg-accent rounded-sm transition-colors"
                           title="Thumbs down"
                         >
-                          <ThumbsDown className="h-4 w-4 text-gray-400 hover:text-[#FF6B35]" />
+                          <ThumbsDown className="h-4 w-4 text-muted-foreground hover:text-primary" />
                         </button>
                         <button
-                          className="p-1.5 hover:bg-[#2a2a2a] rounded transition-colors"
+                          className="p-1.5 hover:bg-accent rounded-sm transition-colors"
                           title="Copy"
                           onClick={() => {
                             navigator.clipboard.writeText(message.content)
                           }}
                         >
-                          <Copy className="h-4 w-4 text-gray-400 hover:text-[#FF6B35]" />
+                          <Copy className="h-4 w-4 text-muted-foreground hover:text-primary" />
                         </button>
                         <button
-                          className="p-1.5 hover:bg-[#2a2a2a] rounded transition-colors ml-auto"
+                          className="p-1.5 hover:bg-accent rounded-sm transition-colors ml-auto"
                           title="Regenerate response"
                         >
-                          <RotateCcw className="h-4 w-4 text-gray-400 hover:text-[#FF6B35]" />
+                          <RotateCcw className="h-4 w-4 text-muted-foreground hover:text-primary" />
                         </button>
                       </div>
                     )}
@@ -428,14 +428,14 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
       </div>
 
       {/* Input Area */}
-      <div className="border-t border-[#2a2a2a] p-4 bg-[#0f0f0f]/50 backdrop-blur-sm flex-shrink-0">
+      <div className="border-t border-border p-4 bg-background flex-shrink-0">
         <div className="flex gap-2 mb-2 flex-wrap items-center">
           <Button
             type="button"
             onClick={() => setShowPaperSearch(!showPaperSearch)}
             variant="outline"
-            className={`border-[#2a2a2a] text-gray-300 text-xs ${
-              showPaperSearch ? 'bg-[#2a2a2a]' : ''
+            className={`text-xs ${
+              showPaperSearch ? 'bg-accent' : ''
             }`}
           >
             <FileText className="mr-2 h-3 w-3" />
@@ -446,14 +446,14 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
               type="button"
               onClick={() => setShowCitationNetworkSelector(true)}
               variant="outline"
-              className="border-[#2a2a2a] text-gray-300 text-xs"
+              className="text-xs"
             >
               <Network className="mr-2 h-3 w-3" />
               Citation Network
             </Button>
           )}
           <div className="flex items-center gap-2 ml-auto">
-            <Label htmlFor="depth" className="text-xs text-gray-400 whitespace-nowrap">
+            <Label htmlFor="depth" className="text-xs text-muted-foreground whitespace-nowrap">
               Depth:
             </Label>
             <Input
@@ -475,7 +475,7 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
                   onDepthChange(depth)
                 }
               }}
-              className="w-20 h-8 bg-[#1f1f1f] border-[#2a2a2a] text-white text-xs"
+              className="w-20 h-8 text-xs"
             />
           </div>
         </div>
@@ -484,12 +484,12 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
             <button
               type="button"
               onClick={toggleRecording}
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 p-1.5 hover:bg-[#2a2a2a] rounded-full transition-colors"
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 p-1.5 hover:bg-accent rounded-sm transition-colors"
             >
               {isRecording ? (
                 <MicOff className="h-5 w-5 text-red-400" />
               ) : (
-                <Mic className="h-5 w-5 text-gray-400" />
+                <Mic className="h-5 w-5 text-muted-foreground" />
               )}
             </button>
             <Input
@@ -497,20 +497,20 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Start typing..."
-              className="w-full pl-12 pr-14 bg-[#1f1f1f] border-[#2a2a2a] text-white placeholder:text-gray-500 rounded-full focus-visible:ring-[#FF6B35] focus-visible:border-[#FF6B35]"
+              className="w-full pl-12 pr-14 bg-background border-border rounded-full"
             />
           </div>
           <Button
             type="submit"
             disabled={!input.trim()}
-            className="rounded-full bg-[#FF6B35] hover:bg-[#FF8555] text-white h-10 w-10 p-0 flex items-center justify-center"
+            className="rounded-full h-10 w-10 p-0 flex items-center justify-center"
           >
             <Send className="h-4 w-4" />
           </Button>
         </form>
         
         {/* Footer text */}
-        <div className="text-center text-xs text-gray-500 mt-2 pb-2">
+        <div className="text-center text-xs text-muted-foreground mt-2 pb-2">
           Free Research Preview. Responses may produce inaccurate information about people, places, or facts.
         </div>
       </div>

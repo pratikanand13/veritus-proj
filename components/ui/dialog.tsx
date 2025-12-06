@@ -21,7 +21,7 @@ const Dialog = ({ open, onOpenChange, children }: DialogProps) => {
       className="fixed inset-0 z-50 flex items-center justify-center"
       onClick={() => onOpenChange(false)}
     >
-      <div className="fixed inset-0 bg-black/50" />
+      <div className="fixed inset-0 bg-black/80 transition-opacity" />
       <div onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
@@ -33,7 +33,7 @@ const DialogContent = ({ children, className }: DialogContentProps) => {
   return (
     <div
       className={cn(
-        "relative z-50 w-full max-w-lg bg-[#1f1f1f] border border-[#2a2a2a] rounded-lg shadow-lg",
+        "rounded-md bg-card border border-border fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-3.5 p-5 shadow-lg sm:rounded-xl",
         className
       )}
     >
@@ -44,7 +44,7 @@ const DialogContent = ({ children, className }: DialogContentProps) => {
 
 const DialogHeader = ({ children, className }: { children: React.ReactNode; className?: string }) => {
   return (
-    <div className={cn("flex flex-col space-y-1.5 p-6", className)}>
+    <div className={cn("flex flex-col space-y-1 text-base", className)}>
       {children}
     </div>
   )
@@ -52,7 +52,7 @@ const DialogHeader = ({ children, className }: { children: React.ReactNode; clas
 
 const DialogTitle = ({ children, className }: { children: React.ReactNode; className?: string }) => {
   return (
-    <h2 className={cn("text-2xl font-semibold leading-none tracking-tight text-white", className)}>
+    <h2 className={cn("text-[0.9rem] font-semibold leading-none tracking-tight", className)}>
       {children}
     </h2>
   )
@@ -68,7 +68,7 @@ const DialogDescription = ({ children, className }: { children: React.ReactNode;
 
 const DialogFooter = ({ children, className }: { children: React.ReactNode; className?: string }) => {
   return (
-    <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 p-6 pt-0", className)}>
+    <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}>
       {children}
     </div>
   )

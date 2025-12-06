@@ -39,16 +39,16 @@ export function SearchSettings({ open, onOpenChange }: SearchSettingsProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#1f1f1f] border-[#2a2a2a] text-white">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle className="text-white">Search Settings</DialogTitle>
-          <DialogDescription className="text-gray-400">
+          <DialogTitle>Search Settings</DialogTitle>
+          <DialogDescription>
             Configure default settings for paper searches
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
-            <label htmlFor="depth" className="text-sm font-medium text-gray-300 block">
+            <label htmlFor="depth" className="text-sm font-medium text-foreground block">
               Default Depth (Number of similar papers)
             </label>
             <Input
@@ -58,9 +58,8 @@ export function SearchSettings({ open, onOpenChange }: SearchSettingsProps) {
               max="500"
               value={depth}
               onChange={(e) => setDepth(parseInt(e.target.value) || DEFAULT_DEPTH)}
-              className="bg-[#171717] border-[#2a2a2a] text-white"
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               This depth will be used automatically when searching for papers. Range: 1-500
             </p>
           </div>
@@ -68,13 +67,11 @@ export function SearchSettings({ open, onOpenChange }: SearchSettingsProps) {
             <Button
               variant="outline"
               onClick={() => onOpenChange(false)}
-              className="border-[#2a2a2a] text-gray-300"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSave}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               Save
             </Button>

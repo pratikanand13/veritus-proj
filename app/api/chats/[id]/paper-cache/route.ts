@@ -10,7 +10,7 @@ import { VeritusPaper } from '@/types/veritus'
  */
 export async function POST(
   request: Request,
-  { params }: { params: { chatId: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser()
@@ -20,8 +20,8 @@ export async function POST(
 
     await connectDB()
 
-    const { chatId } = params
-    if (!mongoose.Types.ObjectId.isValid(chatId)) {
+    const { id } = await params
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json({ error: 'Invalid chat ID' }, { status: 400 })
     }
 
@@ -36,7 +36,7 @@ export async function POST(
     }
 
     const chat = await Chat.findOne({
-      _id: chatId,
+      _id: id,
       userId: user.userId,
     })
 
@@ -103,7 +103,7 @@ export async function POST(
  */
 export async function GET(
   request: Request,
-  { params }: { params: { chatId: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await getCurrentUser()
@@ -113,13 +113,13 @@ export async function GET(
 
     await connectDB()
 
-    const { chatId } = params
-    if (!mongoose.Types.ObjectId.isValid(chatId)) {
+    const { id } = await params
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json({ error: 'Invalid chat ID' }, { status: 400 })
     }
 
     const chat = await Chat.findOne({
-      _id: chatId,
+      _id: id,
       userId: user.userId,
     })
 
