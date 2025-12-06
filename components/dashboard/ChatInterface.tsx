@@ -100,25 +100,76 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
 
   const handleSearchSimilarPapers = async (params: {
     corpusId: string
-    keywords: string[]
-    authors: string[]
-    references: string[]
+    jobType: 'keywordSearch' | 'querySearch' | 'combinedSearch'
+    keywords?: string[]
+    tldrs?: string[]
+    authors?: string[]
+    references?: string[]
+    filters?: {
+      fieldsOfStudy?: string[]
+      minCitationCount?: number
+      openAccessPdf?: boolean
+      downloadable?: boolean
+      quartileRanking?: string[]
+      publicationTypes?: string[]
+      sort?: string
+      year?: string
+      limit?: 100 | 200 | 300
+    }
   }) => {
     if (!chatId) return
 
     setLoadingCitationNetwork(true)
     
     try {
-      const response = await fetch('/api/citation-network', {
+      // Build query parameters
+      const queryParams = new URLSearchParams()
+      if (params.filters?.limit) {
+        queryParams.set('limit', params.filters.limit.toString())
+      }
+      if (params.filters?.fieldsOfStudy && params.filters.fieldsOfStudy.length > 0) {
+        queryParams.set('fieldsOfStudy', params.filters.fieldsOfStudy.join(','))
+      }
+      if (params.filters?.minCitationCount) {
+        queryParams.set('minCitationCount', params.filters.minCitationCount.toString())
+      }
+      if (params.filters?.openAccessPdf !== undefined) {
+        queryParams.set('openAccessPdf', params.filters.openAccessPdf.toString())
+      }
+      if (params.filters?.downloadable !== undefined) {
+        queryParams.set('downloadable', params.filters.downloadable.toString())
+      }
+      if (params.filters?.quartileRanking && params.filters.quartileRanking.length > 0) {
+        queryParams.set('quartileRanking', params.filters.quartileRanking.join(','))
+      }
+      if (params.filters?.publicationTypes && params.filters.publicationTypes.length > 0) {
+        queryParams.set('publicationTypes', params.filters.publicationTypes.join(','))
+      }
+      if (params.filters?.sort) {
+        queryParams.set('sort', params.filters.sort)
+      }
+      if (params.filters?.year) {
+        queryParams.set('year', params.filters.year)
+      }
+
+      // Build request body based on job type
+      const body: any = {}
+      if (params.jobType === 'keywordSearch' || params.jobType === 'combinedSearch') {
+        if (params.keywords && params.keywords.length > 0) {
+          body.phrases = params.keywords
+        }
+      }
+      if (params.jobType === 'querySearch' || params.jobType === 'combinedSearch') {
+        if (params.tldrs && params.tldrs.length > 0) {
+          // Combine TLDRs into a query string
+          body.query = params.tldrs.join(' ')
+        }
+      }
+
+      const response = await fetch(`/api/v1/job/create/${params.jobType}?${queryParams.toString()}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          corpusId: params.corpusId,
-          keywords: params.keywords,
-          authors: params.authors,
-          references: params.references,
-          chatId,
-        }),
+        body: JSON.stringify(body),
       })
 
       if (!response.ok) {
@@ -133,17 +184,20 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
       // Add a message about the search
       if (onAddAssistantMessage) {
         const paramDetails: string[] = []
-        if (params.keywords.length > 0) {
+        if (params.keywords && params.keywords.length > 0) {
           paramDetails.push(`${params.keywords.length} keyword${params.keywords.length !== 1 ? 's' : ''}`)
         }
-        if (params.authors.length > 0) {
+        if (params.tldrs && params.tldrs.length > 0) {
+          paramDetails.push(`${params.tldrs.length} TLDR${params.tldrs.length !== 1 ? 's' : ''}`)
+        }
+        if (params.authors && params.authors.length > 0) {
           paramDetails.push(`${params.authors.length} author${params.authors.length !== 1 ? 's' : ''}`)
         }
-        if (params.references.length > 0) {
+        if (params.references && params.references.length > 0) {
           paramDetails.push(`${params.references.length} reference${params.references.length !== 1 ? 's' : ''}`)
         }
         onAddAssistantMessage(
-          `Searching for similar papers${paramDetails.length > 0 ? ` using ${paramDetails.join(', ')}` : ''}...`
+          `Searching for similar papers using ${params.jobType}${paramDetails.length > 0 ? ` with ${paramDetails.join(', ')}` : ''}...`
         )
       }
     } catch (err: any) {
@@ -582,6 +636,7 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
         corpusId={currentCorpusId || 'default'}
         messages={messages}
         chatId={chatId}
+        depth={depth}
         onSearch={handleSearchSimilarPapers}
       />
 

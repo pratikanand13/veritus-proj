@@ -375,24 +375,75 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
 
   const handleSearchSimilarPapers = async (params: {
     corpusId: string
-    keywords: string[]
-    authors: string[]
-    references: string[]
+    jobType: 'keywordSearch' | 'querySearch' | 'combinedSearch'
+    keywords?: string[]
+    tldrs?: string[]
+    authors?: string[]
+    references?: string[]
+    filters?: {
+      fieldsOfStudy?: string[]
+      minCitationCount?: number
+      openAccessPdf?: boolean
+      downloadable?: boolean
+      quartileRanking?: string[]
+      publicationTypes?: string[]
+      sort?: string
+      year?: string
+      limit?: 100 | 200 | 300
+    }
   }) => {
     setLoadingCorpus(true)
     setError(null)
     
     try {
-      const response = await fetch('/api/citation-network', {
+      // Build query parameters
+      const queryParams = new URLSearchParams()
+      if (params.filters?.limit) {
+        queryParams.set('limit', params.filters.limit.toString())
+      }
+      if (params.filters?.fieldsOfStudy && params.filters.fieldsOfStudy.length > 0) {
+        queryParams.set('fieldsOfStudy', params.filters.fieldsOfStudy.join(','))
+      }
+      if (params.filters?.minCitationCount) {
+        queryParams.set('minCitationCount', params.filters.minCitationCount.toString())
+      }
+      if (params.filters?.openAccessPdf !== undefined) {
+        queryParams.set('openAccessPdf', params.filters.openAccessPdf.toString())
+      }
+      if (params.filters?.downloadable !== undefined) {
+        queryParams.set('downloadable', params.filters.downloadable.toString())
+      }
+      if (params.filters?.quartileRanking && params.filters.quartileRanking.length > 0) {
+        queryParams.set('quartileRanking', params.filters.quartileRanking.join(','))
+      }
+      if (params.filters?.publicationTypes && params.filters.publicationTypes.length > 0) {
+        queryParams.set('publicationTypes', params.filters.publicationTypes.join(','))
+      }
+      if (params.filters?.sort) {
+        queryParams.set('sort', params.filters.sort)
+      }
+      if (params.filters?.year) {
+        queryParams.set('year', params.filters.year)
+      }
+
+      // Build request body based on job type
+      const body: any = {}
+      if (params.jobType === 'keywordSearch' || params.jobType === 'combinedSearch') {
+        if (params.keywords && params.keywords.length > 0) {
+          body.phrases = params.keywords
+        }
+      }
+      if (params.jobType === 'querySearch' || params.jobType === 'combinedSearch') {
+        if (params.tldrs && params.tldrs.length > 0) {
+          // Combine TLDRs into a query string
+          body.query = params.tldrs.join(' ')
+        }
+      }
+
+      const response = await fetch(`/api/v1/job/create/${params.jobType}?${queryParams.toString()}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          corpusId: params.corpusId,
-          keywords: params.keywords,
-          authors: params.authors,
-          references: params.references,
-          chatId: saveToChat && chatId ? chatId : undefined,
-        }),
+        body: JSON.stringify(body),
       })
 
       if (!response.ok) {
@@ -886,6 +937,7 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
           corpusId={searchResult.paper.id}
           messages={messages}
           chatId={chatId}
+          depth={chatDepth}
           onSearch={handleSearchSimilarPapers}
         />
       )}

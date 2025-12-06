@@ -250,6 +250,19 @@ export function useChatPaperStorage(chatId?: string | null, messages?: any[]) {
     return Array.from(references).sort()
   }, [storage])
 
+  // Extract TLDRs from all papers in storage
+  const extractTLDRs = useCallback((): string[] => {
+    const tldrs = new Set<string>()
+    
+    Object.values(storage).forEach((paper) => {
+      if (paper.tldr && paper.tldr.trim()) {
+        tldrs.add(paper.tldr.trim())
+      }
+    })
+
+    return Array.from(tldrs)
+  }, [storage])
+
   return {
     storage,
     isLoading,
@@ -261,6 +274,7 @@ export function useChatPaperStorage(chatId?: string | null, messages?: any[]) {
     extractKeywords,
     extractAuthors,
     extractReferences,
+    extractTLDRs,
     paperCount: Object.keys(storage).length,
   }
 }
