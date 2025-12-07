@@ -166,7 +166,8 @@ export function CitationNetworkFilters({
                   <Checkbox
                     id={`type-${type}`}
                     checked={localFilters.types?.includes(type) || false}
-                    onCheckedChange={(checked) => {
+                    onChange={(e) => {
+                      const checked = e.target.checked
                       const currentTypes = localFilters.types || []
                       const newTypes = checked
                         ? [...currentTypes, type]
@@ -192,7 +193,8 @@ export function CitationNetworkFilters({
                     <Checkbox
                       id={`author-${author}`}
                       checked={localFilters.authors?.includes(author) || false}
-                      onCheckedChange={(checked) => {
+                      onChange={(e) => {
+                        const checked = e.target.checked
                         const currentAuthors = localFilters.authors || []
                         const newAuthors = checked
                           ? [...currentAuthors, author]

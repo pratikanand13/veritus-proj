@@ -126,8 +126,12 @@ export function CitationNetworkEnhanced({
 
     const filteredNodeIds = new Set(filteredNodes.map(n => n.id))
     const filteredEdges = network.edges.filter(e => {
-      const sourceId = typeof e.source === 'string' ? e.source : e.source.id
-      const targetId = typeof e.target === 'string' ? e.target : e.target.id
+      const sourceId = typeof e.source === 'string' 
+        ? e.source 
+        : (e.source as CitationNetworkNode).id
+      const targetId = typeof e.target === 'string' 
+        ? e.target 
+        : (e.target as CitationNetworkNode).id
       return filteredNodeIds.has(sourceId) && filteredNodeIds.has(targetId)
     })
 
@@ -240,8 +244,8 @@ export function CitationNetworkEnhanced({
       .append('line')
       .attr('stroke', (d) => {
         if (interactionState.highlightedPath) {
-          const sourceId = typeof d.source === 'string' ? d.source : d.source.id
-          const targetId = typeof d.target === 'string' ? d.target : d.target.id
+          const sourceId = typeof d.source === 'string' ? d.source : (d.source as CitationNetworkNode).id
+          const targetId = typeof d.target === 'string' ? d.target : (d.target as CitationNetworkNode).id
           const path = interactionState.highlightedPath
           const isOnPath = path.some((id, i) => 
             (i < path.length - 1 && id === sourceId && path[i + 1] === targetId) ||
@@ -261,8 +265,8 @@ export function CitationNetworkEnhanced({
         const w = typeof d.weight === 'number' ? d.weight : 1
         const weighted = clamp(baseWidth * (w * 1.5), 1, 6)
         if (interactionState.highlightedPath) {
-          const sourceId = typeof d.source === 'string' ? d.source : d.source.id
-          const targetId = typeof d.target === 'string' ? d.target : d.target.id
+          const sourceId = typeof d.source === 'string' ? d.source : (d.source as CitationNetworkNode).id
+          const targetId = typeof d.target === 'string' ? d.target : (d.target as CitationNetworkNode).id
           const path = interactionState.highlightedPath
           const isOnPath = path.some((id, i) => 
             (i < path.length - 1 && id === sourceId && path[i + 1] === targetId) ||
@@ -274,8 +278,8 @@ export function CitationNetworkEnhanced({
       })
       .attr('stroke-opacity', (d) => {
         if (interactionState.highlightedPath) {
-          const sourceId = typeof d.source === 'string' ? d.source : d.source.id
-          const targetId = typeof d.target === 'string' ? d.target : d.target.id
+          const sourceId = typeof d.source === 'string' ? d.source : (d.source as CitationNetworkNode).id
+          const targetId = typeof d.target === 'string' ? d.target : (d.target as CitationNetworkNode).id
           const path = interactionState.highlightedPath
           const isOnPath = path.some((id, i) => 
             (i < path.length - 1 && id === sourceId && path[i + 1] === targetId) ||
@@ -370,10 +374,25 @@ export function CitationNetworkEnhanced({
     // Apply layout
     let simulation: d3.Simulation<any, any> | null = null
 
+    // Ensure nodes have D3 simulation properties
+    // Type assertion needed because CitationNetworkNode doesn't include simulation properties in its type
+    const nodesWithSimulationProps = displayData.nodes.map(node => {
+      const nodeWithProps = node as CitationNetworkNode & Partial<d3.SimulationNodeDatum>
+      return {
+        ...nodeWithProps,
+        x: (nodeWithProps as any).x ?? undefined,
+        y: (nodeWithProps as any).y ?? undefined,
+        vx: (nodeWithProps as any).vx ?? undefined,
+        vy: (nodeWithProps as any).vy ?? undefined,
+        fx: (nodeWithProps as any).fx ?? undefined,
+        fy: (nodeWithProps as any).fy ?? undefined,
+      } as CitationNetworkNode & d3.SimulationNodeDatum
+    })
+
     switch (layout) {
       case 'force':
-        simulation = d3.forceSimulation(displayData.nodes)
-          .force('link', d3.forceLink(displayData.edges).id((d: any) => d.id).distance(100))
+        simulation = d3.forceSimulation<CitationNetworkNode & d3.SimulationNodeDatum>(nodesWithSimulationProps)
+          .force('link', d3.forceLink<CitationNetworkNode & d3.SimulationNodeDatum, CitationNetworkEdge>(displayData.edges).id((d: any) => d.id).distance(100))
           .force('charge', d3.forceManyBody().strength(-300))
           .force('center', d3.forceCenter(width / 2, height / 2))
           .force('collision', d3.forceCollide().radius((d: any) => getNodeSize(d, sortBy) + 5))
@@ -384,8 +403,9 @@ export function CitationNetworkEnhanced({
         displayData.nodes.forEach((node, i) => {
           const angle = i * angleStep
           const radius = Math.min(width, height) / 3
-          node.x = width / 2 + radius * Math.cos(angle)
-          node.y = height / 2 + radius * Math.sin(angle)
+          const nodeWithProps = node as CitationNetworkNode & Partial<d3.SimulationNodeDatum>
+          nodeWithProps.x = width / 2 + radius * Math.cos(angle)
+          nodeWithProps.y = height / 2 + radius * Math.sin(angle)
         })
         break
 
@@ -396,8 +416,9 @@ export function CitationNetworkEnhanced({
         displayData.nodes.forEach((node, i) => {
           const col = i % cols
           const row = Math.floor(i / cols)
-          node.x = col * cellWidth + cellWidth / 2
-          node.y = row * cellHeight + cellHeight / 2
+          const nodeWithProps = node as CitationNetworkNode & Partial<d3.SimulationNodeDatum>
+          nodeWithProps.x = col * cellWidth + cellWidth / 2
+          nodeWithProps.y = row * cellHeight + cellHeight / 2
         })
         break
 
@@ -405,8 +426,9 @@ export function CitationNetworkEnhanced({
         // Simple hierarchical layout - root at top, others below
         const rootNode = displayData.nodes.find(n => n.isRoot)
         if (rootNode) {
-          rootNode.x = width / 2
-          rootNode.y = height / 4
+          const rootWithProps = rootNode as CitationNetworkNode & Partial<d3.SimulationNodeDatum>
+          rootWithProps.x = width / 2
+          rootWithProps.y = height / 4
         }
         const otherNodes = displayData.nodes.filter(n => !n.isRoot)
         const nodesPerRow = Math.ceil(Math.sqrt(otherNodes.length))
@@ -414,8 +436,9 @@ export function CitationNetworkEnhanced({
         otherNodes.forEach((node, i) => {
           const col = i % nodesPerRow
           const row = Math.floor(i / nodesPerRow)
-          node.x = (width / nodesPerRow) * col + (width / nodesPerRow) / 2
-          node.y = height / 4 + rowHeight * (row + 1)
+          const nodeWithProps = node as CitationNetworkNode & Partial<d3.SimulationNodeDatum>
+          nodeWithProps.x = (width / nodesPerRow) * col + (width / nodesPerRow) / 2
+          nodeWithProps.y = height / 4 + rowHeight * (row + 1)
         })
         break
     }
@@ -428,29 +451,33 @@ export function CitationNetworkEnhanced({
             const source = typeof d.source === 'string' 
               ? displayData.nodes.find(n => n.id === d.source)
               : d.source
-            return source?.x || 0
+            const sourceWithProps = source as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
+            return (sourceWithProps as any)?.x || 0
           })
           .attr('y1', (d: any) => {
             const source = typeof d.source === 'string' 
               ? displayData.nodes.find(n => n.id === d.source)
               : d.source
-            return source?.y || 0
+            const sourceWithProps = source as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
+            return (sourceWithProps as any)?.y || 0
           })
           .attr('x2', (d: any) => {
             const target = typeof d.target === 'string' 
               ? displayData.nodes.find(n => n.id === d.target)
               : d.target
-            return target?.x || 0
+            const targetWithProps = target as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
+            return (targetWithProps as any)?.x || 0
           })
           .attr('y2', (d: any) => {
             const target = typeof d.target === 'string' 
               ? displayData.nodes.find(n => n.id === d.target)
               : d.target
-            return target?.y || 0
+            const targetWithProps = target as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
+            return (targetWithProps as any)?.y || 0
           })
 
-        node.attr('cx', (d: any) => d.x || 0).attr('cy', (d: any) => d.y || 0)
-        labels.attr('x', (d: any) => d.x || 0).attr('y', (d: any) => d.y || 0)
+        node.attr('cx', (d: any) => (d as any).x || 0).attr('cy', (d: any) => (d as any).y || 0)
+        labels.attr('x', (d: any) => (d as any).x || 0).attr('y', (d: any) => (d as any).y || 0)
       })
     } else {
       // Static layout - update positions immediately
@@ -459,25 +486,29 @@ export function CitationNetworkEnhanced({
           const source = typeof d.source === 'string' 
             ? displayData.nodes.find(n => n.id === d.source)
             : d.source
-          return source?.x || 0
+          const sourceWithProps = source as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
+          return (sourceWithProps as any)?.x || 0
         })
         .attr('y1', (d: any) => {
           const source = typeof d.source === 'string' 
             ? displayData.nodes.find(n => n.id === d.source)
             : d.source
-          return source?.y || 0
+          const sourceWithProps = source as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
+          return (sourceWithProps as any)?.y || 0
         })
         .attr('x2', (d: any) => {
           const target = typeof d.target === 'string' 
             ? displayData.nodes.find(n => n.id === d.target)
             : d.target
-          return target?.x || 0
+          const targetWithProps = target as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
+          return (targetWithProps as any)?.x || 0
         })
         .attr('y2', (d: any) => {
           const target = typeof d.target === 'string' 
             ? displayData.nodes.find(n => n.id === d.target)
             : d.target
-          return target?.y || 0
+          const targetWithProps = target as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
+          return (targetWithProps as any)?.y || 0
         })
 
       node.attr('cx', (d: any) => d.x || 0).attr('cy', (d: any) => d.y || 0)
@@ -648,20 +679,20 @@ export function CitationNetworkEnhanced({
 function createDrag(simulation: d3.Simulation<any, any> | null | undefined) {
   function dragstarted(event: d3.D3DragEvent<SVGCircleElement, CitationNetworkNode, CitationNetworkNode>) {
     if (simulation && !event.active) simulation.alphaTarget(0.3).restart()
-    const subject = event.subject as CitationNetworkNode
-    subject.fx = subject.x
-    subject.fy = subject.y
+    const subject = event.subject as CitationNetworkNode & Partial<d3.SimulationNodeDatum>
+    subject.fx = (subject as any).x
+    subject.fy = (subject as any).y
   }
 
   function dragged(event: d3.D3DragEvent<SVGCircleElement, CitationNetworkNode, CitationNetworkNode>) {
-    const subject = event.subject as CitationNetworkNode
+    const subject = event.subject as CitationNetworkNode & Partial<d3.SimulationNodeDatum>
     subject.fx = event.x
     subject.fy = event.y
   }
 
   function dragended(event: d3.D3DragEvent<SVGCircleElement, CitationNetworkNode, CitationNetworkNode>) {
     if (simulation && !event.active) simulation.alphaTarget(0)
-    const subject = event.subject as CitationNetworkNode
+    const subject = event.subject as CitationNetworkNode & Partial<d3.SimulationNodeDatum>
     subject.fx = null
     subject.fy = null
   }

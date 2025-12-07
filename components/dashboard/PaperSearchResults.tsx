@@ -71,7 +71,7 @@ export function PaperSearchResults({
               <div className="flex items-start gap-3">
                 <Checkbox
                   checked={selectedPapers.includes(paper.id)}
-                  onCheckedChange={() => onTogglePaper(paper.id)}
+                  onChange={() => onTogglePaper(paper.id)}
                   className="mt-1"
                 />
                 <div className="flex-1">

@@ -38,11 +38,14 @@ export function CitationNetwork({ papers, citationNetworkResponse, width = 800, 
         network = {
           nodes: citationNetworkResponse.citationNetwork.nodes.map(node => ({
             id: node.id,
-            label: node.label,
             paper: (node.data as VeritusPaper) || {
               id: node.id,
               title: node.label,
-              impactFactor: { citationCount: node.citations },
+              impactFactor: { 
+                citationCount: node.citations || 0,
+                influentialCitationCount: 0,
+                referenceCount: 0
+              },
               authors: node.authors || '',
               year: node.year,
               journalName: null,
@@ -53,13 +56,17 @@ export function CitationNetwork({ papers, citationNetworkResponse, width = 800, 
               downloadable: false,
               doi: null,
               pdfLink: null,
+              publishedAt: null,
             } as VeritusPaper,
             x: 0,
             y: 0,
             vx: 0,
             vy: 0,
           })),
-          edges: citationNetworkResponse.citationNetwork.edges,
+          edges: citationNetworkResponse.citationNetwork.edges.map(edge => ({
+            ...edge,
+            type: edge.type === 'references' ? 'cited_by' : edge.type,
+          })),
         }
       } else if (citationNetworkResponse.graph) {
         // Simple mode - use graph
@@ -67,11 +74,25 @@ export function CitationNetwork({ papers, citationNetworkResponse, width = 800, 
         network = {
           nodes: citationNetworkResponse.graph.nodes.map(node => ({
             id: node.id,
-            label: node.label,
             paper: {
               id: node.id,
               title: node.label,
-              impactFactor: { citationCount: node.citations },
+              impactFactor: { 
+                citationCount: node.citations || 0,
+                influentialCitationCount: 0,
+                referenceCount: 0
+              },
+              authors: '',
+              year: null,
+              journalName: null,
+              abstract: null,
+              tldr: null,
+              fieldsOfStudy: [],
+              publicationType: null,
+              downloadable: false,
+              doi: null,
+              pdfLink: null,
+              publishedAt: null,
             } as VeritusPaper,
             x: 0,
             y: 0,
@@ -121,9 +142,10 @@ export function CitationNetwork({ papers, citationNetworkResponse, width = 800, 
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('collision', d3.forceCollide().radius(30))
 
-    // Create edges (lines)
+    // Create edges (lines) - properly typed for D3 force link
+    type LinkDatum = d3.SimulationLinkDatum<CitationNetworkNode> & CitationNetworkEdge
     const link = g.append('g')
-      .selectAll('line')
+      .selectAll<SVGLineElement, LinkDatum>('line')
       .data(network.edges)
       .enter()
       .append('line')
@@ -166,7 +188,7 @@ export function CitationNetwork({ papers, citationNetworkResponse, width = 800, 
             try {
               const paperId = paperData.id?.replace('paper-', '').replace('root-', '')
               if (paperId) {
-                const response = await fetch(`/api/v1/papers/${paperId}?chatId=${chatId}&mock=true`)
+                const response = await fetch(`/api/v1/papers/${paperId}?chatId=${chatId}`)
                 if (response.ok) {
                   const data = await response.json()
                   if (data.paper) {
@@ -190,7 +212,7 @@ export function CitationNetwork({ papers, citationNetworkResponse, width = 800, 
       .enter()
       .append('text')
       .text((d) => {
-        const title = d.paper?.title || d.label || 'Unknown'
+        const title = d.paper?.title || 'Unknown'
         return title.length > 30 ? title.substring(0, 30) + '...' : title
       })
       .attr('font-size', '10px')
@@ -234,10 +256,22 @@ export function CitationNetwork({ papers, citationNetworkResponse, width = 800, 
     // Update positions on simulation tick
     simulation.on('tick', () => {
       link
-        .attr('x1', (d) => (d.source as CitationNetworkNode).x!)
-        .attr('y1', (d) => (d.source as CitationNetworkNode).y!)
-        .attr('x2', (d) => (d.target as CitationNetworkNode).x!)
-        .attr('y2', (d) => (d.target as CitationNetworkNode).y!)
+        .attr('x1', (d) => {
+          const source = typeof d.source === 'object' ? d.source : network.nodes.find(n => n.id === d.source)
+          return source?.x ?? 0
+        })
+        .attr('y1', (d) => {
+          const source = typeof d.source === 'object' ? d.source : network.nodes.find(n => n.id === d.source)
+          return source?.y ?? 0
+        })
+        .attr('x2', (d) => {
+          const target = typeof d.target === 'object' ? d.target : network.nodes.find(n => n.id === d.target)
+          return target?.x ?? 0
+        })
+        .attr('y2', (d) => {
+          const target = typeof d.target === 'object' ? d.target : network.nodes.find(n => n.id === d.target)
+          return target?.y ?? 0
+        })
 
       node
         .attr('cx', (d) => d.x!)
@@ -342,7 +376,7 @@ export function CitationNetwork({ papers, citationNetworkResponse, width = 800, 
 }
 
 // Drag behavior function
-function drag(simulation: d3.Simulation<d3.SimulationNodeDatum, undefined>) {
+function drag(simulation: d3.Simulation<CitationNetworkNode, undefined>) {
   function dragstarted(event: d3.D3DragEvent<SVGCircleElement, CitationNetworkNode, CitationNetworkNode>) {
     if (!event.active) simulation.alphaTarget(0.3).restart()
     const subject = event.subject as CitationNetworkNode

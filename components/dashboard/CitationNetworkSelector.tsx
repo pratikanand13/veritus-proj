@@ -95,7 +95,7 @@ export function CitationNetworkSelector({
 
           // Extract keywords from multiple fields
           if (paper.fieldsOfStudy && Array.isArray(paper.fieldsOfStudy)) {
-            paper.fieldsOfStudy.forEach(field => {
+            paper.fieldsOfStudy.forEach((field: string) => {
               if (field && !keywordsFromMessages.includes(field)) {
                 keywordsFromMessages.push(field)
               }
@@ -110,8 +110,8 @@ export function CitationNetworkSelector({
 
           // Extract authors from papers
           if (paper.authors) {
-            const authorList = paper.authors.split(',').map(a => a.trim()).filter(Boolean)
-            authorList.forEach(author => {
+            const authorList = paper.authors.split(',').map((a: string) => a.trim()).filter(Boolean)
+            authorList.forEach((author: string) => {
               if (author && !authorsFromMessages.includes(author)) {
                 authorsFromMessages.push(author)
               }
@@ -136,7 +136,7 @@ export function CitationNetworkSelector({
 
           // Extract keywords
           if (paper.fieldsOfStudy && Array.isArray(paper.fieldsOfStudy)) {
-            paper.fieldsOfStudy.forEach(field => {
+            paper.fieldsOfStudy.forEach((field: string) => {
               if (field && !keywordsFromMessages.includes(field)) {
                 keywordsFromMessages.push(field)
               }
@@ -151,8 +151,8 @@ export function CitationNetworkSelector({
 
           // Extract authors
           if (paper.authors) {
-            const authorList = paper.authors.split(',').map(a => a.trim()).filter(Boolean)
-            authorList.forEach(author => {
+            const authorList = paper.authors.split(',').map((a: string) => a.trim()).filter(Boolean)
+            authorList.forEach((author: string) => {
               if (author && !authorsFromMessages.includes(author)) {
                 authorsFromMessages.push(author)
               }
@@ -173,7 +173,7 @@ export function CitationNetworkSelector({
 
             // Extract keywords
             if (paper.fieldsOfStudy && Array.isArray(paper.fieldsOfStudy)) {
-              paper.fieldsOfStudy.forEach(field => {
+              paper.fieldsOfStudy.forEach((field: string) => {
                 if (field && !keywordsFromMessages.includes(field)) {
                   keywordsFromMessages.push(field)
                 }
@@ -188,8 +188,8 @@ export function CitationNetworkSelector({
 
             // Extract authors
             if (paper.authors) {
-              const authorList = paper.authors.split(',').map(a => a.trim()).filter(Boolean)
-              authorList.forEach(author => {
+              const authorList = paper.authors.split(',').map((a: string) => a.trim()).filter(Boolean)
+              authorList.forEach((author: string) => {
                 if (author && !authorsFromMessages.includes(author)) {
                   authorsFromMessages.push(author)
                 }
@@ -208,11 +208,11 @@ export function CitationNetworkSelector({
           citationNetwork.citationNetwork.nodes.forEach((node: any) => {
             if (node.data && !processedPaperIds.has(node.data.id)) {
               processedPaperIds.add(node.data.id)
-              const paper = node.data
+              const paper = node.data as VeritusPaper
 
               // Extract keywords
               if (paper.fieldsOfStudy && Array.isArray(paper.fieldsOfStudy)) {
-                paper.fieldsOfStudy.forEach(field => {
+                (paper.fieldsOfStudy as string[]).forEach((field: string) => {
                   if (field && !keywordsFromMessages.includes(field)) {
                     keywordsFromMessages.push(field)
                   }
@@ -227,8 +227,8 @@ export function CitationNetworkSelector({
 
               // Extract authors
               if (paper.authors) {
-                const authorList = paper.authors.split(',').map(a => a.trim()).filter(Boolean)
-                authorList.forEach(author => {
+                const authorList = paper.authors.split(',').map((a: string) => a.trim()).filter(Boolean)
+                authorList.forEach((author: string) => {
                   if (author && !authorsFromMessages.includes(author)) {
                     authorsFromMessages.push(author)
                   }

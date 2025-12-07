@@ -142,6 +142,9 @@ export async function POST(
 
     return NextResponse.json(result)
   } catch (error: any) {
+    console.error('Error in job creation route:', error)
+    console.error('Error stack:', error?.stack)
+    
     // Extract error message properly to avoid "[object Object]"
     let errorMessage = 'Failed to create job'
     let statusCode = 500
@@ -163,9 +166,15 @@ export async function POST(
       statusCode = 403
     }
     
+    // Always return JSON, never HTML - ensure Content-Type header is set
     return NextResponse.json(
       { error: errorMessage },
-      { status: statusCode }
+      { 
+        status: statusCode,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
     )
   }
 }

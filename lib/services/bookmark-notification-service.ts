@@ -87,8 +87,8 @@ async function processUserBookmarks(user: any): Promise<void> {
         user.name,
         allRecommendations.map((paper) => ({
           title: paper.title || 'Untitled',
-          tldr: paper.tldr,
-          pdfLink: paper.pdfLink,
+          tldr: paper.tldr ?? undefined,
+          pdfLink: paper.pdfLink ?? undefined,
         }))
       )
 

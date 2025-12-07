@@ -338,8 +338,22 @@ export function PaperChatView({
       })
 
       if (!createJobResponse.ok) {
-        const errorData = await createJobResponse.json()
-        throw new Error(errorData.error || 'Failed to create search job')
+        // Check if response is JSON before parsing
+        const contentType = createJobResponse.headers.get('content-type')
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await createJobResponse.json()
+          throw new Error(errorData.error || 'Failed to create search job')
+        } else {
+          // Response is HTML (error page) - extract status and message
+          const statusText = createJobResponse.statusText || 'Unknown error'
+          throw new Error(`Failed to create search job: ${createJobResponse.status} ${statusText}`)
+        }
+      }
+
+      // Check content type before parsing JSON
+      const contentType = createJobResponse.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Invalid response format from server')
       }
 
       const jobData = await createJobResponse.json()
@@ -364,7 +378,19 @@ export function PaperChatView({
 
         const statusResponse = await fetch(`/api/veritus/job/${jobId}`)
         if (!statusResponse.ok) {
-          throw new Error('Failed to check job status')
+          const contentType = statusResponse.headers.get('content-type')
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await statusResponse.json()
+            throw new Error(errorData.error || 'Failed to check job status')
+          } else {
+            throw new Error(`Failed to check job status: ${statusResponse.status} ${statusResponse.statusText}`)
+          }
+        }
+
+        // Check content type before parsing JSON
+        const statusContentType = statusResponse.headers.get('content-type')
+        if (!statusContentType || !statusContentType.includes('application/json')) {
+          throw new Error('Invalid response format from job status endpoint')
         }
 
         jobStatus = await statusResponse.json()
@@ -387,9 +413,12 @@ export function PaperChatView({
           // For real API, check final status to see if still processing
           const finalStatusResponse = await fetch(`/api/veritus/job/${jobId}`)
           if (finalStatusResponse.ok) {
-            const finalStatus = await finalStatusResponse.json()
-            if (finalStatus.status === 'queued' || finalStatus.status === 'processing') {
-              throw new Error('Search timed out after 60 seconds. The job is still processing. Please try again later.')
+            const finalContentType = finalStatusResponse.headers.get('content-type')
+            if (finalContentType && finalContentType.includes('application/json')) {
+              const finalStatus = await finalStatusResponse.json()
+              if (finalStatus.status === 'queued' || finalStatus.status === 'processing') {
+                throw new Error('Search timed out after 60 seconds. The job is still processing. Please try again later.')
+              }
             }
           }
           throw new Error('Search timed out after 60 seconds or returned no results')

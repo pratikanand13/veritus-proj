@@ -4,6 +4,10 @@
       "path": "/api/cron/bookmark-notifications",
       "schedule": "55 7 * * *"
     }
-  ]
+  ],
+  "env": {
+    "NEXT_PUBLIC_ENV": "dev",
+    "DEV_MODE": "true"
+  }
 }
 

@@ -12,6 +12,7 @@ interface CitationNetworkNode {
   type: 'root' | 'citing' | 'referenced' | 'both'
   isRoot: boolean
   score?: number | null
+  weight?: number
   data: Paper
 }
 
@@ -20,6 +21,12 @@ interface CitationNetworkEdge {
   target: string
   type: 'cites' | 'references'
   weight: number
+  metadata?: {
+    sharedKeywords: string[]
+    sharedAuthors: string[]
+    similarityScore: number
+    chatHistoryBoost: number
+  }
 }
 
 interface CitationNetwork {

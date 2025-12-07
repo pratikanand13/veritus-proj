@@ -1,5 +1,5 @@
 import { VeritusPaper } from '@/types/veritus'
-import { CitationNetwork, CitationNetworkNode, CitationNetworkEdge, GraphOptions } from '@/types/paper-api'
+import { CitationNetwork, CitationNetworkNode, CitationNetworkEdge, GraphOptions, Paper } from '@/types/paper-api'
 
 /**
  * Filter papers based on GraphOptions filters
@@ -107,6 +107,11 @@ function createPaperNode(
   const year = paper.year || null
   const authors = paper.authors || null
 
+  const paperData = {
+    ...paper,
+    sourcePaperId: paper.id, // Track which paper this node came from
+  } as Paper & { sourcePaperId: string }
+
   return {
     primaryKey: paper.id,
     id: isRoot ? `root-${paper.id}` : `paper-${paper.id}`,
@@ -118,10 +123,7 @@ function createPaperNode(
     year,
     authors,
     score,
-    data: {
-      ...paper,
-      sourcePaperId: paper.id, // Track which paper this node came from
-    },
+    data: paperData,
     nodeType: 'paper',
     level,
     weight: 1.0,

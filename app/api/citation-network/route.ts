@@ -198,11 +198,25 @@ export async function POST(request: Request) {
     }
 
     // Build citation network graph using simple graph builder (paper-only structure)
-    const citationNetwork = buildCitationGraphFromPapers(papers, graphOptions)
+    let citationNetwork
+    try {
+      citationNetwork = buildCitationGraphFromPapers(papers, graphOptions)
+    } catch (buildError: any) {
+      console.error('Error building citation graph:', buildError)
+      throw new Error(`Failed to build citation network: ${buildError.message || 'Unknown error'}`)
+    }
+
+    if (!citationNetwork || !citationNetwork.nodes || !Array.isArray(citationNetwork.nodes)) {
+      throw new Error('Invalid citation network structure returned from builder')
+    }
 
     // Get root paper
     const rootNode = citationNetwork.nodes.find((n) => n.isRoot)
     const rootPaper = rootNode?.data || papers.find((p) => p.id === rootPaperId) || papers[0]
+
+    if (!rootPaper) {
+      throw new Error('No root paper found')
+    }
 
     // Build response
     const response: CitationNetworkResponse = {
@@ -219,12 +233,33 @@ export async function POST(request: Request) {
       isMocked: false,
     }
 
-    return NextResponse.json(response)
+    return NextResponse.json(response, {
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
   } catch (error: any) {
     console.error('Error in citation-network endpoint:', error)
+    console.error('Error stack:', error.stack)
+    
+    // Ensure we always return JSON, never HTML
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : typeof error === 'string' 
+        ? error 
+        : 'Internal server error'
+    
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
+      { 
+        error: errorMessage,
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      }
     )
   }
 }
