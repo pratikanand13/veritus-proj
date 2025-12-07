@@ -820,7 +820,7 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                             )}
                             {paper.score && (
                               <Badge className="text-xs bg-purple-600/20 text-purple-300 border-purple-500/50">
-                                {(paper.score * 100).toFixed(1)}% similar
+                                {(paper.score < 1 ? paper.score * 100 : paper.score > 100 ? paper.score / 100 : paper.score).toFixed(2)}% similar
                               </Badge>
                             )}
                           </div>

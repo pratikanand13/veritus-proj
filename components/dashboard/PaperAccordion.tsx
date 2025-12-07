@@ -144,7 +144,7 @@ export function PaperAccordion({ papers, onCreateChatFromHeading }: PaperAccordi
                   )}
                   {paper.score !== null && paper.score !== undefined && (
                     <Badge variant="outline" className="text-xs">
-                      Score: {(paper.score * 100).toFixed(0)}%
+                      Score: {(paper.score < 1 ? paper.score * 100 : paper.score > 100 ? paper.score / 100 : paper.score).toFixed(2)}%
                     </Badge>
                   )}
                 </div>

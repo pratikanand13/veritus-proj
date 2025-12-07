@@ -471,7 +471,7 @@ export function CitationTree({ citationNetworkResponse, chatId, messages, onNode
             {nodeMetadata.score !== null && nodeMetadata.score !== undefined && (
               <Badge variant="outline" className="text-xs border-[#2a2a2a] text-gray-400">
                 <Star className="h-3 w-3 mr-1" />
-                {(nodeMetadata.score * 100).toFixed(0)}%
+                {(nodeMetadata.score < 1 ? nodeMetadata.score * 100 : nodeMetadata.score > 100 ? nodeMetadata.score / 100 : nodeMetadata.score).toFixed(2)}%
               </Badge>
             )}
             {/* Source Paper Badge */}

@@ -96,9 +96,11 @@ export async function POST(request: Request) {
     console.error('Signup error:', error)
     
     // Provide more specific error messages
-    if (error.name === 'ValidationError') {
+    if (error.name === 'ValidationError' && error.errors) {
+      const errorValues = Object.values(error.errors) as Array<{ message?: string }>
+      const firstError = errorValues[0]
       return NextResponse.json(
-        { error: Object.values(error.errors)[0]?.message || 'Validation error' },
+        { error: firstError?.message || 'Validation error' },
         { status: 400 }
       )
     }

@@ -515,7 +515,7 @@ export function AdvancedPaperSearch({ chatId, onSearchResults }: AdvancedPaperSe
                       {paper.impactFactor?.citationCount && (
                         <span>• {paper.impactFactor.citationCount} citations</span>
                       )}
-                      {paper.score && <span>• Score: {paper.score.toFixed(2)}</span>}
+                      {paper.score && <span>• Score: {(paper.score < 1 ? paper.score * 100 : paper.score > 100 ? paper.score / 100 : paper.score).toFixed(2)}%</span>}
                     </div>
                   </CardContent>
                 </Card>
