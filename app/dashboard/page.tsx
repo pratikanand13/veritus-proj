@@ -8,6 +8,7 @@ import { ProjectList } from '@/components/dashboard/ProjectList'
 import { ChatInterface } from '@/components/dashboard/ChatInterface'
 import { Header } from '@/components/dashboard/Header'
 import { PaperSearchPage } from '@/components/dashboard/PaperSearchPage'
+import { PaperChatView } from '@/components/dashboard/PaperChatView'
 import { shouldUseMockData } from '@/lib/config/mock-config'
 
 interface User {
@@ -45,6 +46,7 @@ export default function DashboardPage() {
   const [selectedChat, setSelectedChat] = useState<string | null>(null)
   const [currentMessages, setCurrentMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; timestamp: Date }>>([])
   const [currentChatDepth, setCurrentChatDepth] = useState<number>(100)
+  const [currentChatHasPaperData, setCurrentChatHasPaperData] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingProjects, setLoadingProjects] = useState(false)
   const [loadingChats, setLoadingChats] = useState(false)
@@ -67,10 +69,22 @@ export default function DashboardPage() {
   useEffect(() => {
     if (selectedChat) {
       loadChatMessages(selectedChat)
+      // Also check if chat has paperData from chats list or papers in messages
+      const chat = chats.find(c => c.id === selectedChat)
+      if (chat) {
+        const hasPaperData = !!(chat as any).chatMetadata?.paperData
+        const hasPapersInMessages = (chat.messages || []).some((msg: any) => 
+          msg.papers && Array.isArray(msg.papers) && msg.papers.length > 0
+        )
+        if (hasPaperData || hasPapersInMessages) {
+          setCurrentChatHasPaperData(true)
+        }
+      }
     } else {
       setCurrentMessages([])
+      setCurrentChatHasPaperData(false)
     }
-  }, [selectedChat])
+  }, [selectedChat, chats])
 
   // Listen for chat messages updated events
   useEffect(() => {
@@ -131,11 +145,12 @@ export default function DashboardPage() {
       const response = await fetch('/api/chats')
       if (response.ok) {
         const data = await response.json()
-        // Transform chats to include isFavorite and updatedAt
+        // Transform chats to include isFavorite, updatedAt, and chatMetadata
         const transformedChats = data.chats.map((chat: any) => ({
           ...chat,
           isFavorite: chat.isFavorite || false,
           updatedAt: chat.updatedAt || chat.createdAt,
+          chatMetadata: chat.chatMetadata || {},
         }))
         setChats(transformedChats)
       }
@@ -152,8 +167,13 @@ export default function DashboardPage() {
       const response = await fetch(`/api/chats/${chatId}`)
       if (response.ok) {
         const data = await response.json()
-        setCurrentMessages(data.chat.messages || [])
+        const messages = data.chat.messages || []
+        setCurrentMessages(messages)
         setCurrentChatDepth(data.chat.depth || 100)
+        // Check if chat has paperData in chatMetadata OR has papers in messages
+        const hasPaperData = !!(data.chat.chatMetadata?.paperData)
+        const hasPapersInMessages = messages.some((msg: any) => msg.papers && Array.isArray(msg.papers) && msg.papers.length > 0)
+        setCurrentChatHasPaperData(hasPaperData || hasPapersInMessages)
       }
     } catch (error) {
       console.error('Error loading chat messages:', error)
@@ -254,7 +274,7 @@ export default function DashboardPage() {
     }
   }
 
-  const handleCreateChat = async (title: string) => {
+  const handleCreateChat = async (title: string): Promise<string | null> => {
     // Use the currently selected project from state
     let projectId = selectedProject
     
@@ -289,6 +309,7 @@ export default function DashboardPage() {
         // Automatically select the newly created chat and load its messages
         setSelectedChat(data.chat.id)
         await loadChatMessages(data.chat.id)
+        return data.chat.id as string
       } else {
         const errorData = await response.json()
         console.error('Create chat error response:', errorData)
@@ -298,6 +319,7 @@ export default function DashboardPage() {
       console.error('Error creating chat:', error)
       throw error
     }
+    return null
   }
 
   const handleDeleteChat = async (chatId: string) => {
@@ -352,6 +374,152 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error('Error saving assistant message:', error)
+    }
+  }
+
+  // Create a new chat from a node's full paper data and selected fields
+  // This creates a completely clean single-node root tree with ONLY this paper's data
+  const handleCreateChatFromNode = async (
+    paper: any, 
+    selectedFields?: Map<string, string> | undefined,
+    nodeContext?: any
+  ): Promise<string | null> => {
+    // Rule 1: Create a new chat thread immediately with paper's title
+    const title = paper?.title || 'Untitled Chat'
+    
+    // Rule 2: Transfer ONLY this paper's node data (no siblings, children, parents)
+    // Extract ONLY the paper data - no citation network, no relationships
+    const cleanPaperData = {
+      ...paper,
+      // Ensure no parent/child relationships are copied
+    }
+
+    // Build initial message containing ONLY this paper
+    // IMPORTANT: Content format is different from search results to prevent false positives
+    // Search results use "Found X similar papers" format, this uses "Paper:" format
+    const rootMessage: any = {
+      role: 'assistant' as const,
+      content: `Paper: ${title}\n\nAuthors: ${paper.authors || 'N/A'}\nYear: ${paper.year || 'N/A'}\nJournal: ${paper.journalName || 'N/A'}\n\n${paper.abstract ? `Abstract: ${paper.abstract}` : ''}\n\n${paper.tldr ? `TLDR: ${paper.tldr}` : ''}`,
+      timestamp: new Date(),
+      papers: [cleanPaperData], // Store ONLY this paper, no relationships, no cached search results
+    }
+
+    // Rule 3: Prepare chatMetadata with paper data, selected fields, and API response data
+    // This will initialize chatStore properly when creating the chat
+    const chatMetadata: any = {
+      paperData: cleanPaperData,
+      selectedFields: selectedFields ? Object.fromEntries(selectedFields) : (nodeContext?.selectedFields || {}),
+      apiFieldSelections: nodeContext?.apiFieldSelections || nodeContext?.selectedFields || {},
+      keywords: nodeContext?.keywords || [],
+      tableData: nodeContext?.tableData || {},
+      metadataFields: nodeContext?.metadataFields || [],
+      extractedValues: nodeContext?.extractedValues || {},
+    }
+
+    // Get projectId for chat creation
+    let projectId = selectedProject
+    if (!projectId) {
+      if (projects.length > 0) {
+        projectId = projects[0].id
+        setSelectedProject(projectId)
+        await loadChats(projectId)
+      } else {
+        throw new Error('Please create a project first')
+      }
+    }
+    
+    if (!projectId || projectId.trim().length === 0) {
+      throw new Error('Project ID is required. Please select a project first.')
+    }
+
+    // Create chat with paperData so chatStore gets initialized properly
+    try {
+      console.log('Creating new chat with paper:', title)
+      console.log('Project ID:', projectId)
+      
+      // First, create the chat with paperData (this initializes chatStore)
+      const response = await fetch('/api/chats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          projectId, 
+          title,
+          paperData: cleanPaperData, // Pass paperData to initialize chatStore
+          messages: [rootMessage], // Pass initial message
+        }),
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        let errorData
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { error: errorText || 'Unknown error' }
+        }
+        console.error('Create chat error response:', errorData)
+        alert(`Failed to create chat: ${errorData.error || 'Unknown error'}`)
+        return null
+      }
+
+      const data = await response.json()
+      console.log('Chat creation response:', data)
+      
+      const newChatId = data.chat?.id || data.chat?._id
+      
+      if (!newChatId) {
+        console.error('No chat ID returned from creation. Response:', data)
+        alert('Failed to create chat: No chat ID returned')
+        return null
+      }
+
+      console.log('Chat created successfully with ID:', newChatId)
+
+      // Update chatMetadata with additional node context data
+      try {
+        const updateResponse = await fetch(`/api/chats/${newChatId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chatMetadata, // Update with selected fields, keywords, etc.
+          }),
+        })
+        
+        if (!updateResponse.ok) {
+          const errorText = await updateResponse.text()
+          console.warn('Failed to update chatMetadata:', errorText)
+        } else {
+          console.log('Chat metadata updated successfully')
+        }
+      } catch (error) {
+        console.warn('Error updating chatMetadata:', error)
+        // Continue even if metadata update fails
+      }
+
+      // Rule 6 & 7: Auto-switch to the new chat and refresh sidebar
+      console.log('Refreshing chats list...')
+      await loadChats()
+      console.log('Chats list refreshed')
+      
+      // Wait a moment for chats state to update
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Now switch to the new chat - the useEffect will handle loading messages
+      console.log('Switching to new chat:', newChatId)
+      setSelectedChat(newChatId)
+      
+      // The useEffect will call loadChatMessages and set currentChatHasPaperData
+      // But we also set it here to ensure it's set immediately
+      setCurrentChatHasPaperData(true)
+      
+      console.log('State updated. useEffect should handle loading messages.')
+      console.log('Successfully created and switched to new chat:', newChatId)
+
+      return newChatId
+    } catch (error: any) {
+      console.error('Error creating chat from node:', error)
+      alert(`Error creating chat: ${error.message || 'Unknown error'}`)
+      return null
     }
   }
 
@@ -573,40 +741,6 @@ export default function DashboardPage() {
     }
   }
 
-  const handleNewChat = async (title: string) => {
-    // If no project selected, use first project or create a default one
-    let projectId = selectedProject
-    if (!projectId) {
-      if (projects.length > 0) {
-        projectId = projects[0].id
-        setSelectedProject(projectId)
-        await loadChats(projectId)
-      } else {
-        // Create a default project if none exists
-        try {
-          const response = await fetch('/api/projects', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'Default Project', description: 'Default project for chats' }),
-          })
-          if (response.ok) {
-            const data = await response.json()
-            projectId = data.project.id
-            await loadProjects()
-            setSelectedProject(projectId)
-            await loadChats(projectId)
-          } else {
-            throw new Error('Please create a project first')
-          }
-        } catch (error) {
-          throw new Error('Please create a project first')
-        }
-      }
-    }
-    // Create chat and it will auto-select
-    await handleCreateChat(title)
-  }
-
   const handleNewProject = async (name: string, description?: string) => {
     await handleCreateProject(name, description)
   }
@@ -628,7 +762,6 @@ export default function DashboardPage() {
         <Sidebar
           projects={projects}
           chats={chats}
-          onNewChat={handleNewChat}
           onNewProject={handleNewProject}
           onSelectChat={(chatId) => {
             const chat = chats.find(c => c.id === chatId)
@@ -671,6 +804,7 @@ export default function DashboardPage() {
                   await loadChats(projectId)
                   setSelectedChat(null) // Clear any selected chat when switching projects
                 }}
+                onNewProject={handleNewProject}
                 onUpdateProject={handleUpdateProject}
                 onDeleteProject={handleDeleteProject}
               />
@@ -688,7 +822,6 @@ export default function DashboardPage() {
       <Sidebar
         projects={projects}
         chats={chats}
-        onNewChat={handleNewChat}
         onNewProject={handleNewProject}
         onSelectChat={setSelectedChat}
         onSelectProject={async (projectId) => {
@@ -740,48 +873,76 @@ export default function DashboardPage() {
             {/* Main Content */}
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
               {selectedChat ? (
-                <ChatInterface
-                  chatId={selectedChat}
-                  messages={currentMessages}
-                  chatDepth={currentChatDepth}
-                  loadingMessages={loadingMessages}
-                  onSendMessage={handleSendMessage}
-                  onAddAssistantMessage={handleAddAssistantMessage}
-                  onDepthChange={async (newDepth: number) => {
-                    try {
-                      const response = await fetch(`/api/chats/${selectedChat}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ depth: newDepth }),
-                      })
-                      if (response.ok) {
-                        setCurrentChatDepth(newDepth)
+                currentChatHasPaperData ? (
+                  <PaperChatView
+                    chatId={selectedChat}
+                    projectId={selectedProject!}
+                    chatDepth={currentChatDepth}
+                    onCreateChatFromNode={handleCreateChatFromNode}
+                  />
+                ) : (
+                  <ChatInterface
+                    chatId={selectedChat}
+                    messages={currentMessages}
+                    chatDepth={currentChatDepth}
+                    loadingMessages={loadingMessages}
+                    onSendMessage={handleSendMessage}
+                    onAddAssistantMessage={handleAddAssistantMessage}
+                    onDepthChange={async (newDepth: number) => {
+                      try {
+                        const response = await fetch(`/api/chats/${selectedChat}`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ depth: newDepth }),
+                        })
+                        if (response.ok) {
+                          setCurrentChatDepth(newDepth)
+                        }
+                      } catch (error) {
+                        console.error('Error updating chat depth:', error)
                       }
-                    } catch (error) {
-                      console.error('Error updating chat depth:', error)
-                    }
-                  }}
-                  onCitationNetwork={async (response) => {
-                    // Store citation network response in chat
-                    try {
-                      await fetch(`/api/chats/${selectedChat}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          messages: currentMessages,
-                        }),
-                      })
-                    } catch (error) {
-                      console.error('Error storing citation network:', error)
-                    }
-                  }}
-                />
+                    }}
+                    onCitationNetwork={async (response) => {
+                      // Store citation network response in chat
+                      try {
+                        await fetch(`/api/chats/${selectedChat}`, {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            messages: currentMessages,
+                          }),
+                        })
+                      } catch (error) {
+                        console.error('Error storing citation network:', error)
+                      }
+                    }}
+                    onCreateChatFromNode={handleCreateChatFromNode}
+                  />
+                )
               ) : selectedProject ? (
                 <PaperSearchPage
                   chatId={selectedChat}
-                  onSelectChat={setSelectedChat}
+                  onSelectChat={async (chatId: string) => {
+                    setSelectedChat(chatId)
+                    // Immediately check if this chat has paperData
+                    // This handles the case where chat is created from paper click
+                    try {
+                      const response = await fetch(`/api/chats/${chatId}`)
+                      if (response.ok) {
+                        const data = await response.json()
+                        const hasPaperData = !!(data.chat.chatMetadata?.paperData)
+                        const hasPapersInMessages = (data.chat.messages || []).some((msg: any) => 
+                          msg.papers && Array.isArray(msg.papers) && msg.papers.length > 0
+                        )
+                        setCurrentChatHasPaperData(hasPaperData || hasPapersInMessages)
+                      }
+                    } catch (error) {
+                      console.error('Error checking chat for paperData:', error)
+                    }
+                  }}
                   projectId={selectedProject}
                   chatDepth={currentChatDepth}
+                  onCreateChatFromNode={handleCreateChatFromNode}
                 />
               ) : (
                 <ProjectList

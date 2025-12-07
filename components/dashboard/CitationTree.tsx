@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo, useCallback } from 'react'
-import { ExternalLink, Download, Users, Calendar, TrendingUp, Star, BookOpen, FileText, MoreVertical, ChevronRight, ChevronDown } from 'lucide-react'
+import { ExternalLink, Download, Users, Calendar, TrendingUp, Star, BookOpen, FileText, MoreVertical, ChevronRight, ChevronDown, Plus, Maximize2, X } from 'lucide-react'
 import { CitationNetworkResponse } from '@/types/paper-api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,10 @@ import { CitationTreeFilters, SortOption, SortOrder, FilterState } from './Citat
 import { shouldUseMockData } from '@/lib/config/mock-config'
 import { TreeView, TreeDataItem, TreeRenderItemParams } from '@/components/ui/tree-view'
 import { transformToTreeData } from '@/lib/utils/citation-tree-transform'
+import { PaperDetailsPopover } from './PaperDetailsPopover'
+import { CitationTreeVisualization } from './CitationTreeVisualization'
+import { VeritusPaper } from '@/types/veritus'
+import { NodeTransferPayload } from '@/types/graph-node'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,9 +42,14 @@ interface CitationTreeProps {
   messages?: any[] // Chat messages to initialize cache from
   onNodeClick?: (nodeId: string) => void
   onExpandNode?: (nodeId: string) => Promise<CitationNetworkResponse | null>
+  onCreateChatFromNode?: (
+    paper: VeritusPaper,
+    selectedFields?: Map<string, string>,
+    nodeContext?: NodeTransferPayload
+  ) => Promise<string | null>
 }
 
-export function CitationTree({ citationNetworkResponse, chatId, messages, onNodeClick, onExpandNode }: CitationTreeProps) {
+export function CitationTree({ citationNetworkResponse, chatId, messages, onNodeClick, onExpandNode, onCreateChatFromNode }: CitationTreeProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set())
   const [expandedData, setExpandedData] = useState<Map<string, TreeNode[]>>(new Map())
@@ -48,6 +57,9 @@ export function CitationTree({ citationNetworkResponse, chatId, messages, onNode
   const [sortBy, setSortBy] = useState<SortOption>('relevance')
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [filters, setFilters] = useState<FilterState>({})
+  const [popoverPaper, setPopoverPaper] = useState<VeritusPaper | null>(null)
+  const [popoverOpen, setPopoverOpen] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   
   const useMock = shouldUseMockData()
   const { getCachedPaper, fetchPaperDetails } = usePaperCache(chatId, messages)
@@ -311,20 +323,115 @@ export function CitationTree({ citationNetworkResponse, chatId, messages, onNode
     const nodeMetadata = findNodeMetadata(item.id)
     const isLoading = loadingNodes.has(item.id)
     const isLoadingDetails = loadingDetails.has(item.id)
-    const hasChildren = (item.children && item.children.length > 0) || expandedData.has(item.id) || onExpandNode
+    const hasChildren = (item.children && item.children.length > 0) || expandedData.has(item.id)
+    // Check if node is expandable (has expandable flag and chatId is available for API call)
+    const isExpandable = nodeMetadata?.data?.id && chatId && !hasChildren
+    const nodePaperId = nodeMetadata?.data?.id || nodeMetadata?.data?.sourcePaperId || item.id.replace('paper-', '').replace('root-', '')
     
     if (!nodeMetadata) return null
+
+    // Handle expand button click (calls citation-network API)
+    const handleExpandClick = async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      if (!nodePaperId || !chatId || isLoading) return
+      
+      setLoadingNodes(prev => new Set(prev).add(item.id))
+      try {
+        const queryParams = new URLSearchParams()
+        queryParams.set('chatId', chatId)
+        queryParams.set('paperId', nodePaperId)
+        
+        const response = await fetch(`/api/citation-network?${queryParams.toString()}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        })
+        
+        if (response.ok) {
+          const data: CitationNetworkResponse = await response.json()
+          // Merge new nodes into expanded data
+          if (data.citationNetwork?.nodes) {
+            const newNodes = data.citationNetwork.nodes
+              .filter(n => !n.isRoot)
+              .map(n => ({
+                id: n.id,
+                label: n.label,
+                type: n.type,
+                citations: n.citations,
+                references: n.references,
+                year: n.year,
+                authors: n.authors,
+                score: n.score,
+                publicationType: n.data?.publicationType || null,
+                data: n.data,
+                children: [],
+              }))
+            setExpandedData(prev => {
+              const next = new Map(prev)
+              next.set(item.id, newNodes)
+              return next
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error expanding node:', error)
+      } finally {
+        setLoadingNodes(prev => {
+          const next = new Set(prev)
+          next.delete(item.id)
+          return next
+        })
+      }
+    }
+
+    // Handle node click (show popover)
+    const handleNodeClick = async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      onSelect()
+      
+      // Get paper data for popover
+      let paperData: VeritusPaper | null = null
+      if (nodeMetadata.data) {
+        paperData = nodeMetadata.data as VeritusPaper
+      } else {
+        // Try to fetch paper details
+        const cached = getCachedPaper(nodePaperId)
+        if (cached) {
+          paperData = cached
+        } else {
+          setLoadingDetails(prev => new Set(prev).add(item.id))
+          try {
+            const paper = await fetchPaperDetails(nodePaperId, useMock)
+            if (paper) {
+              paperData = paper
+            }
+          } catch (error) {
+            console.error('Error fetching paper details:', error)
+          } finally {
+            setLoadingDetails(prev => {
+              const next = new Set(prev)
+              next.delete(item.id)
+              return next
+            })
+          }
+        }
+      }
+      
+      if (paperData) {
+        setPopoverPaper(paperData)
+        setPopoverOpen(true)
+      }
+    }
 
     return (
       <div
         className={`
-          flex items-center gap-2 p-3 rounded-lg cursor-pointer transition-all
+          group flex items-center gap-2 p-3 rounded-lg cursor-pointer transition-all
           ${isSelected ? 'bg-[#2a2a2a] border border-green-500/50' : 'bg-[#171717] hover:bg-[#1f1f1f]'}
         `}
-        onClick={onSelect}
+        onClick={handleNodeClick}
       >
-        {/* Expand/Collapse Button */}
-        {hasChildren || onExpandNode ? (
+        {/* Expand/Collapse Button (for existing children) */}
+        {hasChildren ? (
           <button
             onClick={(e) => {
               e.stopPropagation()
@@ -366,6 +473,12 @@ export function CitationTree({ citationNetworkResponse, chatId, messages, onNode
                 {(nodeMetadata.score * 100).toFixed(0)}%
               </Badge>
             )}
+            {/* Source Paper Badge */}
+            {nodeMetadata.data?.sourcePaperId && (
+              <Badge variant="outline" className="text-xs border-green-500/50 text-green-400 bg-green-500/10">
+                Source: {nodeMetadata.data.sourcePaperId.substring(0, 8)}...
+              </Badge>
+            )}
           </div>
           
           {/* Node Metadata */}
@@ -394,8 +507,20 @@ export function CitationTree({ citationNetworkResponse, chatId, messages, onNode
 
         {/* Actions */}
         <div className="flex items-center gap-1">
-          {isLoading && (
-            <div className="h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          {/* Expand Button (+ icon) for expandable nodes */}
+          {isExpandable && (
+            <button
+              onClick={handleExpandClick}
+              disabled={isLoading}
+              className="p-1 hover:bg-[#2a2a2a] rounded disabled:opacity-50 flex items-center justify-center w-6 h-6 text-green-500 hover:text-green-400 transition-colors"
+              title="Expand to show similar papers"
+            >
+              {isLoading ? (
+                <div className="h-4 w-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+            </button>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -426,7 +551,7 @@ export function CitationTree({ citationNetworkResponse, chatId, messages, onNode
         </div>
       </div>
     )
-  }, [treeData, loadingNodes, loadingDetails, typeColors])
+  }, [treeData, loadingNodes, loadingDetails, typeColors, chatId, getCachedPaper, fetchPaperDetails, useMock, expandedData])
 
   if (!treeViewData || treeViewData.length === 0) {
     return (
@@ -439,13 +564,24 @@ export function CitationTree({ citationNetworkResponse, chatId, messages, onNode
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h3 className="text-lg font-semibold text-white">Citation Tree</h3>
           <p className="text-sm text-gray-400">
-            {citationNetworkResponse?.citationNetwork?.stats.totalNodes || 0} nodes • {' '}
+            {citationNetworkResponse?.citationNetwork?.stats.totalNodes || 0} nodes •{' '}
             {citationNetworkResponse?.citationNetwork?.stats.totalEdges || 0} connections
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-gray-300 hover:text-white hover:bg-white/10"
+            onClick={() => setIsFullscreen(true)}
+            title="View full screen"
+          >
+            <Maximize2 className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -464,139 +600,69 @@ export function CitationTree({ citationNetworkResponse, chatId, messages, onNode
         onClearFilters={() => setFilters({})}
       />
 
-      {/* Tree View */}
-      <div className="bg-[#0f0f0f] rounded-lg border border-[#2a2a2a] p-4 max-h-[800px] overflow-y-auto">
-        <TreeView
-          data={treeViewData}
-          initialSelectedItemId={selectedNodeId || undefined}
-          onSelectChange={(item) => {
-            if (item) {
-              setSelectedNodeId(item.id)
-            } else {
-              setSelectedNodeId(null)
-            }
-          }}
-          renderItem={renderTreeItem}
-          defaultNodeIcon={FileText}
-          defaultLeafIcon={FileText}
-        />
+      {/* Graph Visualization - Vertical Tree (inline + full-screen overlay using same instance) */}
+      <div className="relative">
+        {/* Full-screen backdrop */}
+        {isFullscreen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/70"
+            onClick={() => setIsFullscreen(false)}
+          />
+        )}
+
+        {/* Graph container - position changes based on fullscreen state */}
+        <div
+          className={
+            isFullscreen
+              ? 'fixed inset-4 z-50 bg-[#0f0f0f] rounded-lg border border-[#2a2a2a] p-4 shadow-2xl flex flex-col'
+              : 'bg-[#0f0f0f] rounded-lg border border-[#2a2a2a] p-4 h-[600px]'
+          }
+        >
+          {isFullscreen && (
+            <div className="flex items-center justify-between mb-3 flex-shrink-0">
+              <div>
+                <p className="text-sm font-medium text-white">Citation Tree — Full Screen</p>
+                <p className="text-xs text-gray-400">
+                  {citationNetworkResponse?.citationNetwork?.stats.totalNodes || 0} nodes •{' '}
+                  {citationNetworkResponse?.citationNetwork?.stats.totalEdges || 0} connections
+                </p>
+              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 text-gray-300 hover:text-white hover:bg-white/10"
+                onClick={() => setIsFullscreen(false)}
+                title="Close full screen"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
+          <div className={isFullscreen ? 'flex-1 min-h-0' : ''}>
+            <CitationTreeVisualization
+              citationNetworkResponse={citationNetworkResponse}
+              chatId={chatId}
+              // When fullscreen, allow SVG to size to container; inline keeps explicit defaults
+              width={isFullscreen ? undefined : 800}
+              height={isFullscreen ? undefined : 600}
+              messages={messages}
+              onNodeClick={(paper: VeritusPaper) => {
+                setPopoverPaper(paper)
+                setPopoverOpen(true)
+              }}
+              onCreateChatFromNode={onCreateChatFromNode}
+            />
+          </div>
+        </div>
       </div>
 
-      {/* Node Details Panel */}
-      {selectedNodeData && selectedNodeData.data && (
-        <Card className="bg-[#1f1f1f] border-[#2a2a2a]">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm text-white flex items-center justify-between">
-              <span>Paper Details</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setSelectedNodeId(null)}
-                className="h-6 w-6 text-gray-400"
-              >
-                ×
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            {/* Title */}
-            <div>
-              <div className="text-xs text-gray-400 mb-1">Title</div>
-              <div className="text-white">{selectedNodeData.data.title || selectedNodeData.label}</div>
-            </div>
-
-            {/* Authors */}
-            {selectedNodeData.data.authors && (
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Authors</div>
-                <div className="text-gray-300">{selectedNodeData.data.authors}</div>
-              </div>
-            )}
-
-            {/* Abstract/TLDR */}
-            {(selectedNodeData.data.tldr || selectedNodeData.data.abstract) && (
-              <div>
-                <div className="text-xs text-gray-400 mb-1">Summary</div>
-                <div className="text-gray-300 text-xs line-clamp-3">
-                  {selectedNodeData.data.tldr || selectedNodeData.data.abstract}
-                </div>
-              </div>
-            )}
-
-            {/* Metadata Grid */}
-            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-[#2a2a2a]">
-              {selectedNodeData.data.year && (
-                <div>
-                  <div className="text-xs text-gray-400">Year</div>
-                  <div className="text-white">{selectedNodeData.data.year}</div>
-                </div>
-              )}
-              {selectedNodeData.data.score !== undefined && (
-                <div>
-                  <div className="text-xs text-gray-400">Score</div>
-                  <div className="text-white">{(selectedNodeData.data.score * 100).toFixed(1)}%</div>
-                </div>
-              )}
-              {selectedNodeData.data.publicationType && (
-                <div>
-                  <div className="text-xs text-gray-400">Publication Type</div>
-                  <div className="text-white text-xs truncate">{selectedNodeData.data.publicationType}</div>
-                </div>
-              )}
-              {selectedNodeData.data.impactFactor?.citationCount !== undefined && (
-                <div>
-                  <div className="text-xs text-gray-400">Citations</div>
-                  <div className="text-white">{selectedNodeData.data.impactFactor.citationCount}</div>
-                </div>
-              )}
-              {selectedNodeData.data.journalName && (
-                <div>
-                  <div className="text-xs text-gray-400">Journal</div>
-                  <div className="text-white text-xs truncate">{selectedNodeData.data.journalName}</div>
-                </div>
-              )}
-              {selectedNodeData.data.fieldsOfStudy && selectedNodeData.data.fieldsOfStudy.length > 0 && (
-                <div>
-                  <div className="text-xs text-gray-400">Fields</div>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {selectedNodeData.data.fieldsOfStudy.slice(0, 3).map((field: string, idx: number) => (
-                      <Badge key={idx} variant="outline" className="text-xs border-[#2a2a2a] text-gray-400">
-                        {field}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Links */}
-            <div className="flex gap-2 pt-2 border-t border-[#2a2a2a]">
-              {selectedNodeData.data.link && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(selectedNodeData.data.link, '_blank')}
-                  className="flex-1 border-[#2a2a2a] text-gray-300 hover:bg-[#2a2a2a]"
-                >
-                  <ExternalLink className="h-3 w-3 mr-1" />
-                  View Paper
-                </Button>
-              )}
-              {selectedNodeData.data.pdfLink && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.open(selectedNodeData.data.pdfLink, '_blank')}
-                  className="flex-1 border-[#2a2a2a] text-gray-300 hover:bg-[#2a2a2a]"
-                >
-                  <Download className="h-3 w-3 mr-1" />
-                  PDF
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Paper Details Popover */}
+      <PaperDetailsPopover
+        paper={popoverPaper}
+        open={popoverOpen}
+        onOpenChange={setPopoverOpen}
+      />
     </div>
   )
 }

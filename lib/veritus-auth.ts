@@ -5,8 +5,14 @@ import UserSettings from '@/models/UserSettings'
 /**
  * Get Veritus API key for current user
  * Returns user's API key if set, otherwise falls back to environment variable
+ * When DEBUG=true, returns a dummy key to avoid errors (mock data will be used instead)
  */
 export async function getVeritusApiKey(): Promise<string> {
+  // If DEBUG mode is enabled, return dummy key (mock data will be used)
+  if (process.env.DEBUG === 'true') {
+    return 'debug-mode-dummy-key'
+  }
+
   const user = await getCurrentUser()
   if (!user) {
     throw new Error('Unauthorized')

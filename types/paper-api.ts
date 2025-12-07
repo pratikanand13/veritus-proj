@@ -41,6 +41,22 @@ export interface CitationNetworkNode {
    * Optional node weight (importance) derived from citations/relevance/recency/overlap
    */
   weight?: number
+  /**
+   * For child nodes: parent node ID
+   */
+  parentId?: string
+  /**
+   * Node type: paper, keyword, tldr, or author
+   */
+  nodeType?: 'paper' | 'keyword' | 'tldr' | 'author'
+  /**
+   * Depth level (0 = root, 1 = papers, 2 = children)
+   */
+  level?: number
+  /**
+   * Whether this node can be expanded to show similar papers
+   */
+  expandable?: boolean
 }
 
 export interface CitationNetworkEdge {
@@ -67,6 +83,8 @@ export interface CitationNetwork {
     totalEdges: number
     citingCount: number
     referencedCount: number
+    paperNodes?: number
+    childNodes?: number
   }
   tree?: {
     root: Paper
@@ -179,10 +197,14 @@ export interface CitationNetworkResponse {
     networkType?: string
     depth: number
     mode?: 'simple' | 'full'
-    sortBy?: 'relevance' | 'citations' | 'year'
+    sortBy?: 'relevance' | 'citations' | 'year' | 'title'
+    sortOrder?: 'asc' | 'desc'
     weighting?: 'balanced' | 'citations' | 'recency' | 'keywords'
     phrases?: string[]
     query?: string
+    filters?: GraphOptions['filters']
+    limit?: number
+    chatId?: string
     userInputs?: {
       keywords?: string[]
       authors?: string[]
@@ -225,5 +247,22 @@ export interface CitationNetworkFilterResponse {
     filteredCount: number
     limit: number | null
   }
+}
+
+// Graph options for building citation networks from papers
+export interface GraphOptions {
+  rootPaperId?: string
+  sortBy?: 'relevance' | 'citations' | 'year' | 'title'
+  sortOrder?: 'asc' | 'desc'
+  filters?: {
+    minCitations?: number
+    maxCitations?: number
+    minYear?: number
+    maxYear?: number
+    fieldsOfStudy?: string[]
+    authors?: string[]
+    publicationTypes?: string[]
+  }
+  limit?: number
 }
 

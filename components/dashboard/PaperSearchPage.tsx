@@ -21,9 +21,10 @@ interface PaperSearchPageProps {
   onSelectChat?: (chatId: string) => void
   projectId?: string | null
   chatDepth?: number
+  onCreateChatFromNode?: (paper: VeritusPaper, selectedFields?: Map<string, string>) => Promise<string | null>
 }
 
-export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 100 }: PaperSearchPageProps) {
+export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 100, onCreateChatFromNode }: PaperSearchPageProps) {
   const [titleQuery, setTitleQuery] = useState('')
   const [corpusIdQuery, setCorpusIdQuery] = useState('')
   const [loading, setLoading] = useState(false)
@@ -259,7 +260,7 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
     // Create or select a chat for this paper
     if (onSelectChat && projectId) {
       try {
-        // Create a new chat with paper title
+        // Create a new chat with paper title and paper data
         const chatTitle = paper.title.length > 50 ? paper.title.substring(0, 50) + '...' : paper.title
         const chatResponse = await fetch('/api/chats', {
           method: 'POST',
@@ -267,6 +268,24 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
           body: JSON.stringify({
             projectId,
             title: chatTitle,
+            paperData: {
+              id: paper.id,
+              title: paper.title,
+              authors: paper.authors,
+              year: paper.year,
+              journalName: paper.journalName,
+              abstract: paper.abstract,
+              tldr: paper.tldr,
+              citationCount: paper.impactFactor?.citationCount,
+              pdfLink: paper.pdfLink,
+              fieldsOfStudy: paper.fieldsOfStudy,
+              publicationType: paper.publicationType,
+            },
+            messages: [{
+              role: 'assistant',
+              content: `Paper: ${paper.title}\n\nAuthors: ${paper.authors || 'N/A'}\nYear: ${paper.year || 'N/A'}\nJournal: ${paper.journalName || 'N/A'}\n\n${paper.abstract ? `Abstract: ${paper.abstract}` : ''}\n\n${paper.tldr ? `TLDR: ${paper.tldr}` : ''}`,
+              timestamp: new Date(),
+            }],
           }),
         })
         
@@ -465,135 +484,112 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden">
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto w-full p-4 space-y-4">
-        {/* Header */}
-        <div className="text-center space-y-3">
-          <div className="flex items-center justify-center gap-3">
-            <FileText className="h-8 w-8 text-green-500" />
-            <h1 className="text-3xl font-semibold text-foreground">Paper Search</h1>
+        <div className="max-w-5xl mx-auto w-full p-8 space-y-8">
+          {/* Header */}
+          <div className="text-center space-y-4">
+            <div className="flex items-center justify-center gap-3">
+              <FileText className="h-10 w-10 text-[#22c55e]" />
+              <h1 className="text-4xl font-semibold text-foreground">Paper Search</h1>
+            </div>
+            <p className="text-muted-foreground text-lg">Search for academic papers by title or corpus ID</p>
           </div>
-          <p className="text-muted-foreground text-base">Search for academic papers by title or corpus ID</p>
-        </div>
 
-        <div className="space-y-6 mt-6">
-        {/* Chat Selection Info */}
-        {projectId && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <MessageSquare className="h-5 w-5 text-green-500" />
-                  <div className="text-sm text-card-foreground">
-                    {chatId ? (
-                      <span>Results will be saved to the current chat</span>
-                    ) : (
-                      <span className="text-muted-foreground">Click on any paper to open a chat window</span>
-                    )}
-                  </div>
-                </div>
-                {chatId && (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="saveToChat"
-                      checked={saveToChat}
-                      onChange={(e) => setSaveToChat(e.target.checked)}
-                      className="w-4 h-4 rounded text-green-500"
+          {/* Hint Box */}
+          {projectId && !chatId && (
+            <div className="bg-[#22c55e]/20 border border-[#22c55e]/30 rounded-lg p-4 flex items-center gap-3">
+              <MessageSquare className="h-5 w-5 text-[#22c55e] flex-shrink-0" />
+              <p className="text-sm text-foreground">Click on any paper to open a chat window</p>
+            </div>
+          )}
+
+          <div className="space-y-6">
+
+            {/* Search Forms */}
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Title Search */}
+              <Card className="bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-foreground">
+                    <FileText className="h-5 w-5 text-[#22c55e]" />
+                    Search by Title
+                  </CardTitle>
+                  <CardDescription className="text-muted-foreground">
+                    Find papers by entering the paper title
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleTitleSearch} className="space-y-4">
+                    <Input
+                      type="text"
+                      placeholder="Enter paper title..."
+                      value={titleQuery}
+                      onChange={(e) => setTitleQuery(e.target.value)}
+                      disabled={loading}
+                      className="bg-background border-border text-foreground"
                     />
-                    <label htmlFor="saveToChat" className="text-sm text-card-foreground cursor-pointer">
-                      Save to chat
-                    </label>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                    <Button
+                      type="submit"
+                      disabled={loading || !titleQuery.trim()}
+                      className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Searching...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="mr-2 h-4 w-4" />
+                          Search
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
 
-        {/* Search Forms */}
-        <div className="grid md:grid-cols-2 gap-4">
-          {/* Title Search */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Search by Title
-              </CardTitle>
-              <CardDescription>
-                Find papers by entering the paper title
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleTitleSearch} className="space-y-3">
-                <Input
-                  type="text"
-                  placeholder="Enter paper title..."
-                  value={titleQuery}
-                  onChange={(e) => setTitleQuery(e.target.value)}
-                  disabled={loading}
-                />
-                <Button
-                  type="submit"
-                  disabled={loading || !titleQuery.trim()}
-                  className="w-full"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Searching...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="mr-2 h-4 w-4" />
-                      Search
-                    </>
-                  )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* Corpus ID Search */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="h-5 w-5" />
-                Search by Corpus ID
-              </CardTitle>
-              <CardDescription>
-                Find papers by entering the corpus ID
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleCorpusIdSearch} className="space-y-3">
-                <Input
-                  type="text"
-                  placeholder="Enter corpus ID (e.g., corpus:12345678)"
-                  value={corpusIdQuery}
-                  onChange={(e) => setCorpusIdQuery(e.target.value)}
-                  disabled={loading}
-                />
-                <Button
-                  type="submit"
-                  disabled={loading || !corpusIdQuery.trim()}
-                  className="w-full"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Searching...
-                    </>
-                  ) : (
-                    <>
-                      <Search className="mr-2 h-4 w-4" />
-                      Search
-                    </>
-                  )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+              {/* Corpus ID Search */}
+              <Card className="bg-card border-border">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-foreground">
+                    <Search className="h-5 w-5 text-[#22c55e]" />
+                    Search by Corpus ID
+                  </CardTitle>
+                  <CardDescription className="text-muted-foreground">
+                    Find papers by entering the corpus ID
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleCorpusIdSearch} className="space-y-4">
+                    <Input
+                      type="text"
+                      placeholder="Enter corpus ID (e.g., corpus:12345678)"
+                      value={corpusIdQuery}
+                      onChange={(e) => setCorpusIdQuery(e.target.value)}
+                      disabled={loading}
+                      className="bg-background border-border text-foreground"
+                    />
+                    <Button
+                      type="submit"
+                      disabled={loading || !corpusIdQuery.trim()}
+                      className="w-full bg-[#22c55e] hover:bg-[#16a34a] text-white"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Searching...
+                        </>
+                      ) : (
+                        <>
+                          <Search className="mr-2 h-4 w-4" />
+                          Search
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            </div>
 
         {/* Error Display */}
         {error && (
@@ -887,6 +883,7 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
               <CitationTree
                 citationNetworkResponse={citationNetworkResponse}
                 chatId={chatId}
+                onCreateChatFromNode={onCreateChatFromNode}
                 onExpandNode={async (nodeId: string) => {
                   try {
                     const response = await fetch('/api/paper/citation-network', {

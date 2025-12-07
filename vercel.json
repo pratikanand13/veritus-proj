@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/bookmark-notifications",
+      "schedule": "55 7 * * *"
+    }
+  ]
+}
+

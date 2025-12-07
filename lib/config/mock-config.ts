@@ -4,6 +4,7 @@
  * Supports both `mock` and `isMocked` fields for backward compatibility
  * 
  * IMPORTANT: Mock mode is automatically disabled when VERITUS_API_KEY is present
+ * DEBUG mode: When DEBUG=true in .env, use mock data for search and similar-search APIs only
  */
 
 /**
@@ -11,16 +12,22 @@
  * Checks environment variable first, then falls back to provided flag
  * 
  * Priority:
- * 1. NEXT_PUBLIC_USE_MOCK_DATA environment variable (if explicitly set)
- * 2. Provided isMocked flag
- * 3. VERITUS_API_KEY presence (if key exists, disable mocks)
- * 4. Default behavior
+ * 1. DEBUG environment variable (if true, use mock for search APIs only)
+ * 2. NEXT_PUBLIC_USE_MOCK_DATA environment variable (if explicitly set)
+ * 3. Provided isMocked flag
+ * 4. VERITUS_API_KEY presence (if key exists, disable mocks)
+ * 5. Default behavior
  * 
  * @param isMocked - Optional flag to force mock mode
  * @returns true if mock mode should be used
  */
 export function shouldUseMockData(isMocked?: boolean): boolean {
-  // Check environment variable first (for global mock mode override)
+  // Check DEBUG environment variable first (for search APIs only)
+  if (process.env.DEBUG === 'true') {
+    return true
+  }
+  
+  // Check environment variable (for global mock mode override)
   if (process.env.NEXT_PUBLIC_USE_MOCK_DATA === 'true') {
     return true
   }
@@ -53,6 +60,14 @@ export function shouldUseMockData(isMocked?: boolean): boolean {
 }
 
 /**
+ * Check if DEBUG mode is enabled
+ * @returns true if DEBUG=true in .env
+ */
+export function isDebugMode(): boolean {
+  return process.env.DEBUG === 'true'
+}
+
+/**
  * Normalizes mock flag from request
  * Handles both `mock` and `isMocked` fields for backward compatibility
  * @param params - Request parameters that may contain mock flag
@@ -67,7 +82,7 @@ export function normalizeMockFlag(params: { mock?: boolean; isMocked?: boolean }
     return params.mock
   }
   // Default to environment-based decision
-  // Use mock data if VERITUS_API_KEY is not set
+  // Use mock data if DEBUG=true or VERITUS_API_KEY is not set
   return shouldUseMockData()
 }
 

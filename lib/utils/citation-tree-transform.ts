@@ -14,6 +14,10 @@ interface TreeNode {
   publicationType?: string | null
   data?: any
   children?: TreeNode[]
+  parentId?: string
+  nodeType?: 'paper' | 'keyword' | 'tldr' | 'author'
+  level?: number
+  expandable?: boolean
 }
 
 interface TransformOptions {
@@ -37,6 +41,7 @@ interface TransformOptions {
 
 /**
  * Transform CitationNetworkResponse to TreeDataItem format for shadcn TreeView
+ * Simplified structure: only paper nodes (no keyword/author/TLDR children)
  */
 export function transformToTreeData(
   citationNetworkResponse: CitationNetworkResponse | undefined,
@@ -45,64 +50,55 @@ export function transformToTreeData(
   if (!citationNetworkResponse?.citationNetwork) return null
 
   const { nodes, edges } = citationNetworkResponse.citationNetwork
-  const rootNode = nodes.find(n => n.isRoot)
+  
+  // In simplified structure, all nodes are paper nodes
+  const paperNodes = nodes.filter(n => n.nodeType === 'paper' || n.isRoot || !n.nodeType)
+  const rootNode = paperNodes.find(n => n.isRoot)
   
   if (!rootNode) return null
 
-  // Build adjacency list for children
+  // Build hierarchy from edges: root -> similar papers
   const childrenMap = new Map<string, TreeNode[]>()
+  const nodeMap = new Map<string, CitationNetworkNode>()
   
+  // Create map of all nodes
+  paperNodes.forEach(node => {
+    nodeMap.set(node.id, node)
+  })
+  
+  // Build parent-child relationships from edges
   edges.forEach(edge => {
     const sourceId = typeof edge.source === 'string' ? edge.source : (edge.source as any)?.id || edge.source
     const targetId = typeof edge.target === 'string' ? edge.target : (edge.target as any)?.id || edge.target
     
-    // Root references other papers (children)
-    if (sourceId === rootNode.id) {
-      if (!childrenMap.has(rootNode.id)) {
-        childrenMap.set(rootNode.id, [])
-      }
-      const childNode = nodes.find(n => n.id === targetId)
-      if (childNode) {
-        const nodeData = (childNode.data || {}) as any
-        const existingChildren = childrenMap.get(rootNode.id)!
-        existingChildren.push({
-          id: childNode.id,
-          label: childNode.label,
-          type: childNode.type,
-          citations: childNode.citations,
-          references: childNode.references,
-          year: childNode.year,
-          authors: childNode.authors,
-          score: childNode.score ?? nodeData?.score ?? null,
-          publicationType: nodeData?.publicationType || nodeData?.publication_type || null,
-          data: nodeData,
-          children: [],
-        })
-      }
-    }
+    const sourceNode = nodeMap.get(sourceId)
+    const targetNode = nodeMap.get(targetId)
     
-    // Papers that cite root (also children, but different type)
-    if (targetId === rootNode.id) {
+    if (!sourceNode || !targetNode) return
+    
+    // Root references other papers (children)
+    if (sourceId === rootNode.id && targetNode.nodeType === 'paper') {
       if (!childrenMap.has(rootNode.id)) {
         childrenMap.set(rootNode.id, [])
       }
-      const citingNode = nodes.find(n => n.id === sourceId)
-      if (citingNode && !childrenMap.get(rootNode.id)!.some(n => n.id === citingNode.id)) {
-        const nodeData = (citingNode.data || {}) as any
-        childrenMap.get(rootNode.id)!.push({
-          id: citingNode.id,
-          label: citingNode.label,
-          type: citingNode.type,
-          citations: citingNode.citations,
-          references: citingNode.references,
-          year: citingNode.year,
-          authors: citingNode.authors,
-          score: citingNode.score ?? nodeData?.score ?? null,
-          publicationType: nodeData?.publicationType || nodeData?.publication_type || null,
-          data: nodeData,
-          children: [],
-        })
-      }
+      const nodeData = (targetNode.data || {}) as any
+      childrenMap.get(rootNode.id)!.push({
+        id: targetNode.id,
+        label: targetNode.label,
+        type: targetNode.type,
+        citations: targetNode.citations,
+        references: targetNode.references,
+        year: targetNode.year,
+        authors: targetNode.authors,
+        score: targetNode.score ?? nodeData?.score ?? null,
+        publicationType: nodeData?.publicationType || nodeData?.publication_type || null,
+        data: nodeData,
+        nodeType: targetNode.nodeType || 'paper',
+        parentId: targetNode.parentId,
+        level: targetNode.level,
+        expandable: targetNode.expandable || false,
+        children: [],
+      })
     }
   })
 
@@ -119,7 +115,21 @@ export function transformToTreeData(
     score: rootNode.score ?? rootData?.score ?? null,
     publicationType: rootData?.publicationType || rootData?.publication_type || null,
     data: rootData,
-    children: childrenMap.get(rootNode.id) || [],
+    nodeType: rootNode.nodeType || 'paper',
+    level: rootNode.level || 0,
+    expandable: rootNode.expandable || false,
+    children: (childrenMap.get(rootNode.id) || []).map(child => {
+      return buildTreeNodeWithChildren(child, childrenMap)
+    }),
+  }
+  
+  // Helper function to recursively build tree nodes with children
+  function buildTreeNodeWithChildren(node: TreeNode, childrenMap: Map<string, TreeNode[]>): TreeNode {
+    const children = childrenMap.get(node.id) || []
+    return {
+      ...node,
+      children: children.map(child => buildTreeNodeWithChildren(child, childrenMap)),
+    }
   }
 
   // Merge expanded data
@@ -144,16 +154,16 @@ export function transformToTreeData(
 }
 
 /**
- * Process node with filters and sorting
+ * Process node with filters and sorting (recursive)
  */
 function processNode(node: TreeNode, options: TransformOptions): TreeNode {
   let processed = { ...node }
 
-  // Process children first
+  // Process children
   if (processed.children) {
     let processedChildren = [...processed.children]
 
-    // Apply filters
+    // Apply filters (all nodes are paper nodes in simplified structure)
     if (options.filters) {
       const filters = options.filters
       if (filters.publicationTypes && filters.publicationTypes.length > 0) {
@@ -188,7 +198,7 @@ function processNode(node: TreeNode, options: TransformOptions): TreeNode {
       }
     }
 
-    // Apply sorting
+    // Apply sorting (all nodes are paper nodes)
     if (options.sortBy && options.sortOrder) {
       processedChildren.sort((a, b) => {
         let aVal: any, bVal: any
@@ -241,8 +251,9 @@ function transformTreeNodeToTreeDataItem(
   node: TreeNode,
   options: TransformOptions
 ): TreeDataItem {
-  // Determine icon based on node type
+  // Determine icon based on node type (all nodes are papers in simplified structure)
   let IconComponent: React.ComponentType<{ className?: string }> | undefined
+  
   if (node.type === 'root') {
     IconComponent = FileText
   } else if (node.type === 'citing') {
@@ -250,7 +261,7 @@ function transformTreeNodeToTreeDataItem(
   } else if (node.type === 'referenced') {
     IconComponent = BookOpen
   } else {
-    IconComponent = FileText
+    IconComponent = FileText // Default for paper nodes
   }
 
   const isSelected = options.selectedNodeId === node.id
@@ -264,8 +275,9 @@ function transformTreeNodeToTreeDataItem(
     openIcon: IconComponent,
     children: node.children?.map(child => transformTreeNodeToTreeDataItem(child, options)),
     onClick: () => options.onNodeClick?.(node.id),
-    draggable: true,
+    draggable: true, // All nodes are paper nodes, so draggable
     className: isSelected ? 'bg-accent' : undefined,
-  }
+    // Store expandable flag and node data for use in CitationTree component
+    // Note: TreeDataItem doesn't have expandable/data fields, so we'll need to access via node.data
+  } as TreeDataItem & { expandable?: boolean; data?: any }
 }
-

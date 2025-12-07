@@ -1,52 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
-import { resolvePaper } from '@/lib/services/paper-service'
-import { buildPhrases, buildPhrasesFromUserInput } from '@/lib/services/phrase-builder'
-import { runCombinedSearch } from '@/lib/services/job-service'
-import { buildGraph } from '@/lib/services/graph-builder'
-import { buildCitationNetwork } from '@/lib/services/citation-network-builder'
-import { buildTree } from '@/lib/services/tree-builder'
-import { CitationNetworkRequest, CitationNetworkResponse } from '@/types/paper-api'
+import connectDB from '@/lib/db'
+import Chat from '@/models/Chat'
+import mongoose from 'mongoose'
+import { VeritusPaper } from '@/types/veritus'
+import { buildCitationGraphFromPapers } from '@/lib/utils/citation-graph-builder'
+import { CitationNetworkRequest, CitationNetworkResponse, GraphOptions } from '@/types/paper-api'
 import { storePaperSearchInChat } from '@/lib/chat-paper-integration'
-import { normalizeMockFlag } from '@/lib/config/mock-config'
-import { getMockCitationNetworkResponse } from '@/lib/mock-data/mock-data-manager'
-
-/**
- * Load mock data from file (with variation support)
- */
-function loadMockCitationNetworkData(corpusId?: string, simple?: boolean): CitationNetworkResponse {
-  // Use corpusId to deterministically select variant, or random if not provided
-  const variant = corpusId ? parseInt(corpusId.slice(-1)) % 3 : undefined
-  const mockData = getMockCitationNetworkResponse(variant) as any
-  
-  // If simple mode, return simplified structure
-  if (simple) {
-    return {
-      paper: mockData.paper,
-      similarPapers: mockData.searchResults || [],
-      graph: {
-        nodes: (mockData.citationNetwork?.nodes || []).map((n: any) => ({
-          id: n.id,
-          label: n.label,
-          citations: n.citations,
-          isRoot: n.isRoot,
-        })),
-        edges: (mockData.citationNetwork?.edges || []).map((e: any) => ({
-          source: typeof e.source === 'string' ? e.source : e.source.id,
-          target: typeof e.target === 'string' ? e.target : e.target.id,
-          weight: e.weight,
-        })),
-      },
-      meta: {
-        ...mockData.meta,
-        mode: 'simple',
-      },
-      isMocked: true,
-    } as CitationNetworkResponse
-  }
-  
-  return { ...mockData, isMocked: true } as CitationNetworkResponse
-}
 
 export async function POST(request: Request) {
   try {
@@ -60,9 +20,8 @@ export async function POST(request: Request) {
 
     const body: CitationNetworkRequest = await request.json()
     const {
-      corpusId,
-      depth = 50,
       chatId,
+      depth = 50,
       simple = false,
       sortBy = 'relevance',
       weighting = 'balanced',
@@ -70,14 +29,19 @@ export async function POST(request: Request) {
       authors = [],
       references = [],
     } = body
-    
-    // Normalize mock flag (supports both mock and isMocked)
-    const useMock = normalizeMockFlag(body)
 
-    // Validate input
-    if (!corpusId && !useMock) {
+    // chatId is required - we need it to fetch papers from chat messages
+    if (!chatId) {
       return NextResponse.json(
-        { error: 'corpusId is required' },
+        { error: 'chatId is required to generate citation network from chat messages' },
+        { status: 400 }
+      )
+    }
+
+    // Validate chatId format
+    if (!mongoose.Types.ObjectId.isValid(chatId)) {
+      return NextResponse.json(
+        { error: 'Invalid chatId format' },
         { status: 400 }
       )
     }
@@ -89,202 +53,148 @@ export async function POST(request: Request) {
     const weightingMode = validWeighting.includes(weighting as string) ? (weighting as any) : 'balanced'
 
     const limit = depth || 50
+
+    // Connect to database
+    await connectDB()
+
+    // Fetch chat by chatId and userId (security: user can only access their own chats)
+    const chat = await Chat.findOne({
+      _id: chatId,
+      userId: user.userId,
+    })
+
+    if (!chat) {
+      return NextResponse.json(
+        { error: 'Chat not found' },
+        { status: 404 }
+      )
+    }
+
+    // Extract all papers from messages (from similar-search results)
+    const papersMap = new Map<string, VeritusPaper>()
+    
+    if (chat.messages && Array.isArray(chat.messages)) {
+      chat.messages.forEach((message: any) => {
+        // Extract from message.papers (these are from similar-search)
+        if (message.papers && Array.isArray(message.papers)) {
+          message.papers.forEach((paper: VeritusPaper) => {
+            if (paper && paper.id) {
+              papersMap.set(paper.id, paper)
+            }
+          })
+        }
+
+        // Extract from citationNetwork.paper
+        if (message.citationNetwork?.paper) {
+          const paper = message.citationNetwork.paper
+          if (paper && paper.id) {
+            papersMap.set(paper.id, paper)
+          }
+        }
+
+        // Extract from citationNetwork.similarPapers
+        if (message.citationNetwork?.similarPapers && Array.isArray(message.citationNetwork.similarPapers)) {
+          message.citationNetwork.similarPapers.forEach((paper: VeritusPaper) => {
+            if (paper && paper.id) {
+              papersMap.set(paper.id, paper)
+            }
+          })
+        }
+      })
+    }
+
+    // Convert map to array
+    const papers = Array.from(papersMap.values())
+
+    if (papers.length === 0) {
+      return NextResponse.json(
+        { error: 'No papers found in chat messages. Please perform a similar paper search first.' },
+        { status: 404 }
+      )
+    }
+
+    // Determine root paper from chatMetadata
+    let rootPaperId: string | undefined
+    if (chat.chatMetadata?.paperData?.id) {
+      rootPaperId = chat.chatMetadata.paperData.id
+    } else if (papers.length > 0) {
+      rootPaperId = papers[0].id
+    }
+
+    // Build graph options
+    const graphOptions: GraphOptions = {
+      rootPaperId,
+      sortBy: sortAlgorithm as any,
+      sortOrder: 'desc',
+      limit,
+    }
+
+    // Build citation network graph from papers stored in chat
+    const citationNetwork = buildCitationGraphFromPapers(papers, graphOptions)
+
+    // Get root paper
+    const rootNode = citationNetwork.nodes.find((n) => n.isRoot)
+    const rootPaper = rootNode?.data || papers.find((p) => p.id === rootPaperId) || papers[0]
+
     let result: CitationNetworkResponse
 
-    if (useMock) {
-      // Handle mock requests with variation support
-      const mockData = loadMockCitationNetworkData(corpusId, simple)
-      
-      if (simple) {
-        // Simple mode: return Visualization-like structure
-        const citationNetwork = mockData.citationNetwork || (mockData as any).graph
-        const simpleGraph = {
-          nodes: (citationNetwork?.nodes || []).map((node: any) => ({
-            id: node.id,
-            label: node.label || node.title,
-            citations: node.citations || 0,
-            isRoot: node.isRoot || false,
+    if (simple) {
+      // Simple mode: return Visualization-like structure
+      result = {
+        paper: rootPaper,
+        similarPapers: papers.filter(p => p.id !== rootPaperId).slice(0, limit),
+        graph: {
+          nodes: citationNetwork.nodes.map((n) => ({
+            id: n.id,
+            label: n.label,
+            citations: n.citations || 0,
+            isRoot: n.isRoot || false,
           })),
-          edges: (citationNetwork?.edges || []).map((edge: any) => ({
-            source: edge.source,
-            target: edge.target,
-            weight: edge.weight || 0.5,
+          edges: citationNetwork.edges.map((e) => ({
+            source: e.source,
+            target: e.target,
+            weight: e.weight || 0.5,
           })),
-        }
-        
-        result = {
-          paper: mockData.paper,
-          similarPapers:
-            (citationNetwork?.nodes || [])
-              .filter((n: any) => !n.isRoot)
-              .map((n: any) => ({
-                id: n.id,
-                title: n.label || n.title,
-                impactFactor: { citationCount: n.citations || 0 },
-              })),
-          graph: simpleGraph,
-          meta: {
-            phrases: mockData.meta?.phrases || [],
-            query: mockData.meta?.query || '',
-            depth: limit,
-            mode: 'simple',
-            sortBy: sortAlgorithm,
-            weighting: weightingMode,
-          },
-          isMocked: true,
-        }
-      } else {
-        // Full citation network mode
-        result = {
-          paper: mockData.paper,
-          searchResults: (mockData as any).searchResults || [],
-          citationNetwork: {
-            nodes: mockData.citationNetwork?.nodes || [],
-            edges: mockData.citationNetwork?.edges || [],
-            stats: mockData.citationNetwork?.stats || {
-              totalNodes: 0,
-              totalEdges: 0,
-              citingCount: 0,
-              referencedCount: 0,
-            },
-            tree: mockData.citationNetwork?.tree || undefined,
-          },
-          meta: {
-            ...mockData.meta,
-            depth: limit,
-            mode: 'full',
-            sortBy: sortAlgorithm,
-            weighting: weightingMode,
-            userInputs: {
-              keywords: keywords.length > 0 ? keywords : undefined,
-              authors: authors.length > 0 ? authors : undefined,
-              references: references.length > 0 ? references : undefined,
-            },
-          },
-          isMocked: true,
-        }
-      }
-    } else {
-      // Call services directly
-      try {
-        console.log('Calling citation network services directly:', {
-          corpusId,
+        },
+        meta: {
           depth: limit,
-          simple,
+          mode: 'simple',
           sortBy: sortAlgorithm,
           weighting: weightingMode,
-        })
-
-        // Get the main paper
-        const paper = await resolvePaper(null, corpusId)
-
-        if (simple) {
-          // Simple mode: Visualization-like output
-          const { phrases, query } = buildPhrases(paper)
-          const similarPapers = await runCombinedSearch(phrases, query, limit)
-          const graph = buildGraph(paper, similarPapers.slice(0, limit))
-
-          result = {
-            paper,
-            similarPapers: similarPapers.slice(0, limit),
-            graph,
-            meta: {
-              phrases,
-              query,
-              depth: limit,
-              mode: 'simple',
-              sortBy: sortAlgorithm,
-            },
-            isMocked: false,
-          }
-        } else {
-          // Full citation network mode with user inputs
-          const { phrases, query } = buildPhrasesFromUserInput({
-            paper,
-            keywords: Array.isArray(keywords) ? keywords : [],
-            authors: Array.isArray(authors) ? authors : [],
-            references: Array.isArray(references) ? references : [],
-          })
-
-          // Run combined search - this internally:
-          // 1. Creates job via POST /v1/job/combinedSearch → returns jobId
-          // 2. Polls job status via GET /v1/job/{jobId} every 2 seconds
-          // 3. Returns results when status === "success"
-          const searchResults = await runCombinedSearch(phrases, query, limit)
-
-          // TODO: Fetch papers that this paper cites (references/backward citations)
-          // This would require accessing paper.references or a separate API call
-          // For now, we'll create an empty array - this should be implemented when citation data is available
-          const referencedPapers: any[] = []
-
-          // Build citation network graph structure with sorting
-          const citationNetwork = buildCitationNetwork(
-            paper,
-            searchResults,
-            referencedPapers,
-            sortAlgorithm,
-            {
-              weighting: weightingMode,
-              userInputs: {
-                keywords: keywords as string[],
-                authors: authors as string[],
-                references: references as string[],
-              },
-            }
-          )
-
-          // Build tree structure
-          const allPapers = [paper, ...searchResults]
-          const tree = buildTree(paper, allPapers, citationNetwork.edges)
-
-          result = {
-            paper,
-            searchResults: searchResults, // Return sorted search results
-            citationNetwork: {
-              nodes: citationNetwork.nodes,
-              edges: citationNetwork.edges,
-              stats: citationNetwork.stats,
-              tree: tree ? {
-                root: paper,
-                levels: tree.levels.map(level => ({
-                  level: level.level,
-                  nodes: level.nodes as any, // Tree builder uses Paper type, but these are VeritusPaper
-                  description: level.description,
-                })),
-                relationships: tree.relationships,
-              } : undefined, // Add tree structure
-            },
-            meta: {
-              networkType: 'citation',
-              depth: limit,
-              phrases,
-              query,
-              mode: 'full',
-              sortBy: sortAlgorithm,
-              weighting: weightingMode,
-              userInputs: {
-                keywords: keywords.length > 0 ? keywords : undefined,
-                authors: authors.length > 0 ? authors : undefined,
-                references: references.length > 0 ? references : undefined,
-              },
-            },
-            isMocked: false,
-          }
-        }
-
-        console.log('Citation network service response received')
-      } catch (error: any) {
-        console.error('Error calling citation network services:', error)
-        if (error.message === 'Paper not found') {
-          return NextResponse.json(
-            { error: error.message },
-            { status: 404 }
-          )
-        }
-        return NextResponse.json(
-          { error: error.message || 'Failed to get citation network' },
-          { status: 500 }
-        )
+          chatId,
+        },
+        isMocked: false,
+      }
+    } else {
+      // Full citation network mode
+      result = {
+        paper: rootPaper,
+        similarPapers: papers.filter(p => p.id !== rootPaperId).slice(0, limit),
+        citationNetwork: {
+          nodes: citationNetwork.nodes,
+          edges: citationNetwork.edges,
+          stats: {
+            totalNodes: citationNetwork.nodes.length,
+            totalEdges: citationNetwork.edges.length,
+            citingCount: citationNetwork.nodes.filter(n => !n.isRoot).length,
+            referencedCount: 0,
+            paperNodes: citationNetwork.nodes.length,
+          },
+        },
+        meta: {
+          networkType: 'citation',
+          depth: limit,
+          mode: 'full',
+          sortBy: sortAlgorithm,
+          weighting: weightingMode,
+          chatId,
+          userInputs: {
+            keywords: keywords.length > 0 ? keywords : undefined,
+            authors: authors.length > 0 ? authors : undefined,
+            references: references.length > 0 ? references : undefined,
+          },
+        },
+        isMocked: false,
       }
     }
 

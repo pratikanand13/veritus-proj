@@ -27,6 +27,12 @@ interface KeywordSelectionPanelProps {
   messages: Message[]
   chatId?: string | null
   depth?: number // Chat depth for limit parameter
+  initialSuggestions?: {
+    keywords?: string[]
+    authors?: string[]
+    references?: string[]
+    tldrs?: string[]
+  } // Initial suggestions from current node and parent nodes
   onSearch: (params: {
     corpusId: string
     jobType: 'keywordSearch' | 'querySearch' | 'combinedSearch'
@@ -68,6 +74,7 @@ export function KeywordSelectionPanel({
   messages,
   chatId,
   depth = 100,
+  initialSuggestions,
   onSearch,
 }: KeywordSelectionPanelProps) {
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([])
@@ -88,171 +95,135 @@ export function KeywordSelectionPanel({
   const [sortDirection, setSortDirection] = useState<string>('desc')
   const [yearFilter, setYearFilter] = useState<string>('')
 
-  // Use robust chat paper storage hook
-  const {
-    extractKeywords: getKeywordsFromStorage,
-    extractAuthors: getAuthorsFromStorage,
-    extractReferences: getReferencesFromStorage,
-    extractTLDRs: getTLDRsFromStorage,
-    refreshStorage,
-    isLoading: isLoadingStorage,
-    paperCount,
-  } = useChatPaperStorage(chatId, messages)
+  // State to store root paper from chat store
+  const [rootPaper, setRootPaper] = useState<VeritusPaper | null>(null)
+  const [isLoadingRootPaper, setIsLoadingRootPaper] = useState(false)
 
-  // Refresh storage when dialog opens
+  // Fetch root paper from chat store when dialog opens
   useEffect(() => {
-    if (open && chatId) {
-      refreshStorage()
+    const fetchRootPaper = async () => {
+      if (!open || !chatId) {
+        setRootPaper(null)
+        return
+      }
+
+      setIsLoadingRootPaper(true)
+      try {
+        const response = await fetch(`/api/chats/${chatId}`)
+        if (response.ok) {
+          const data = await response.json()
+          const chat = data.chat
+
+          // Get root paper from chatMetadata.paperData (the paper from Stage 2)
+          if (chat?.chatMetadata?.paperData) {
+            setRootPaper(chat.chatMetadata.paperData)
+          } else if (messages && messages.length > 0) {
+            // Fallback: get from first message's papers
+            const firstMessage = messages[0]
+            if (firstMessage?.papers && firstMessage.papers.length > 0) {
+              setRootPaper(firstMessage.papers[0])
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching root paper:', error)
+      } finally {
+        setIsLoadingRootPaper(false)
+      }
     }
-  }, [open, chatId, refreshStorage])
 
-  // Extract suggested keywords, authors, references, and TLDRs
-  const { suggestedKeywords, suggestedAuthors, suggestedReferences, suggestedTLDRs } = useMemo(() => {
-    const keywordsFromStorage = getKeywordsFromStorage()
-    const authorsFromStorage = getAuthorsFromStorage()
-    const referencesFromStorage = getReferencesFromStorage()
-    const tldrsFromStorage = getTLDRsFromStorage()
+    fetchRootPaper()
+  }, [open, chatId, messages])
 
-    // Also extract from messages as fallback
-    const keywordsFromMessages: string[] = []
-    const authorsFromMessages: string[] = []
-    const referencesFromMessages: string[] = []
-    const tldrsFromMessages: string[] = []
-    const processedPaperIds = new Set<string>()
+  // Extract suggested keywords, authors, references, TLDRs, and years from root paper AND initial suggestions
+  const { suggestedKeywords, suggestedAuthors, suggestedReferences, suggestedTLDRs, suggestedYears, suggestedJournals } = useMemo(() => {
+    const keywords: string[] = []
+    const authors: string[] = []
+    const references: string[] = []
+    const tldrs: string[] = []
+    const years: number[] = []
+    const journals: string[] = []
 
-    const chatMessages = messages || []
+    // Add initial suggestions from current node and parent nodes (from chatstore)
+    if (initialSuggestions) {
+      if (initialSuggestions.keywords) {
+        initialSuggestions.keywords.forEach(kw => {
+          if (kw && !keywords.includes(kw)) keywords.push(kw)
+        })
+      }
+      if (initialSuggestions.authors) {
+        initialSuggestions.authors.forEach(author => {
+          if (author && !authors.includes(author)) authors.push(author)
+        })
+      }
+      if (initialSuggestions.references) {
+        initialSuggestions.references.forEach(ref => {
+          if (ref && !references.includes(ref)) references.push(ref)
+        })
+      }
+      if (initialSuggestions.tldrs) {
+        initialSuggestions.tldrs.forEach(tldr => {
+          if (tldr && !tldrs.includes(tldr)) tldrs.push(tldr)
+        })
+      }
+    }
 
-    chatMessages.forEach((message) => {
-      if (message.papers && message.papers.length > 0) {
-        message.papers.forEach((paper) => {
-          if (processedPaperIds.has(paper.id)) return
-          processedPaperIds.add(paper.id)
-
-          if (paper.fieldsOfStudy && Array.isArray(paper.fieldsOfStudy)) {
-            paper.fieldsOfStudy.forEach((field: string) => {
-              if (field && !keywordsFromMessages.includes(field)) {
-                keywordsFromMessages.push(field)
-              }
-            })
-          }
-          if (paper.journalName && !keywordsFromMessages.includes(paper.journalName)) {
-            keywordsFromMessages.push(paper.journalName)
-          }
-          if (paper.publicationType && !keywordsFromMessages.includes(paper.publicationType)) {
-            keywordsFromMessages.push(paper.publicationType)
-          }
-
-          if (paper.authors) {
-            const authorList = paper.authors.split(',').map((a: string) => a.trim()).filter(Boolean)
-            authorList.forEach((author: string) => {
-              if (author && !authorsFromMessages.includes(author)) {
-                authorsFromMessages.push(author)
-              }
-            })
-          }
-
-          if (paper.title && !paper.title.startsWith('corpus:') && !referencesFromMessages.includes(paper.title)) {
-            referencesFromMessages.push(paper.title)
-          }
-
-          if (paper.tldr && paper.tldr.trim() && !tldrsFromMessages.includes(paper.tldr.trim())) {
-            tldrsFromMessages.push(paper.tldr.trim())
+    // Also extract from root paper (chat store entry) for backward compatibility
+    if (rootPaper) {
+      // Extract from fieldsOfStudy
+      if (rootPaper.fieldsOfStudy && Array.isArray(rootPaper.fieldsOfStudy)) {
+        rootPaper.fieldsOfStudy.forEach((field: string) => {
+          if (field && !keywords.includes(field)) {
+            keywords.push(field)
           }
         })
       }
 
-      if (message.citationNetwork) {
-        const citationNetwork = message.citationNetwork
-        
-        if (citationNetwork.paper && !processedPaperIds.has(citationNetwork.paper.id)) {
-          processedPaperIds.add(citationNetwork.paper.id)
-          const paper = citationNetwork.paper
-
-          if (paper.fieldsOfStudy && Array.isArray(paper.fieldsOfStudy)) {
-            paper.fieldsOfStudy.forEach((field: string) => {
-              if (field && !keywordsFromMessages.includes(field)) {
-                keywordsFromMessages.push(field)
-              }
-            })
-          }
-          if (paper.journalName && !keywordsFromMessages.includes(paper.journalName)) {
-            keywordsFromMessages.push(paper.journalName)
-          }
-          if (paper.publicationType && !keywordsFromMessages.includes(paper.publicationType)) {
-            keywordsFromMessages.push(paper.publicationType)
-          }
-
-          if (paper.authors) {
-            const authorList = paper.authors.split(',').map((a: string) => a.trim()).filter(Boolean)
-            authorList.forEach((author: string) => {
-              if (author && !authorsFromMessages.includes(author)) {
-                authorsFromMessages.push(author)
-              }
-            })
-          }
-
-          if (paper.title && !referencesFromMessages.includes(paper.title)) {
-            referencesFromMessages.push(paper.title)
-          }
-
-          if (paper.tldr && paper.tldr.trim() && !tldrsFromMessages.includes(paper.tldr.trim())) {
-            tldrsFromMessages.push(paper.tldr.trim())
-          }
-        }
-
-        if (citationNetwork.similarPapers && Array.isArray(citationNetwork.similarPapers)) {
-          citationNetwork.similarPapers.forEach((paper: VeritusPaper) => {
-            if (processedPaperIds.has(paper.id)) return
-            processedPaperIds.add(paper.id)
-
-            if (paper.fieldsOfStudy && Array.isArray(paper.fieldsOfStudy)) {
-              paper.fieldsOfStudy.forEach((field: string) => {
-                if (field && !keywordsFromMessages.includes(field)) {
-                  keywordsFromMessages.push(field)
-                }
-              })
-            }
-            if (paper.journalName && !keywordsFromMessages.includes(paper.journalName)) {
-              keywordsFromMessages.push(paper.journalName)
-            }
-            if (paper.publicationType && !keywordsFromMessages.includes(paper.publicationType)) {
-              keywordsFromMessages.push(paper.publicationType)
-            }
-
-            if (paper.authors) {
-              const authorList = paper.authors.split(',').map((a: string) => a.trim()).filter(Boolean)
-              authorList.forEach((author: string) => {
-                if (author && !authorsFromMessages.includes(author)) {
-                  authorsFromMessages.push(author)
-                }
-              })
-            }
-
-            if (paper.title && !referencesFromMessages.includes(paper.title)) {
-              referencesFromMessages.push(paper.title)
-            }
-
-            if (paper.tldr && paper.tldr.trim() && !tldrsFromMessages.includes(paper.tldr.trim())) {
-              tldrsFromMessages.push(paper.tldr.trim())
-            }
-          })
-        }
+      // Extract from journalName
+      if (rootPaper.journalName && !journals.includes(rootPaper.journalName)) {
+        journals.push(rootPaper.journalName)
       }
-    })
 
-    // Combine storage and messages, prioritizing storage
-    const allKeywords = [...new Set([...keywordsFromStorage, ...keywordsFromMessages])]
-    const allAuthors = [...new Set([...authorsFromStorage, ...authorsFromMessages])]
-    const allReferences = [...new Set([...referencesFromStorage, ...referencesFromMessages])]
-    const allTLDRs = [...new Set([...tldrsFromStorage, ...tldrsFromMessages])]
+      // Extract from publicationType
+      if (rootPaper.publicationType && !keywords.includes(rootPaper.publicationType)) {
+        keywords.push(rootPaper.publicationType)
+      }
+
+      // Extract authors
+      if (rootPaper.authors) {
+        const authorList = rootPaper.authors.split(',').map((a: string) => a.trim()).filter(Boolean)
+        authorList.forEach((author: string) => {
+          if (author && !authors.includes(author)) {
+            authors.push(author)
+          }
+        })
+      }
+
+      // Extract title as reference
+      if (rootPaper.title && !rootPaper.title.startsWith('corpus:')) {
+        references.push(rootPaper.title)
+      }
+
+      // Extract TLDR
+      if (rootPaper.tldr && rootPaper.tldr.trim()) {
+        tldrs.push(rootPaper.tldr.trim())
+      }
+
+      // Extract year
+      if (rootPaper.year && typeof rootPaper.year === 'number') {
+        years.push(rootPaper.year)
+      }
+    }
 
     return {
-      suggestedKeywords: allKeywords.sort(),
-      suggestedAuthors: allAuthors.sort(),
-      suggestedReferences: allReferences.sort(),
-      suggestedTLDRs: allTLDRs,
+      suggestedKeywords: keywords.sort(),
+      suggestedAuthors: authors.sort(),
+      suggestedReferences: references.sort(),
+      suggestedTLDRs: tldrs,
+      suggestedYears: years.sort((a, b) => b - a), // Sort descending
+      suggestedJournals: journals.sort(),
     }
-  }, [getKeywordsFromStorage, getAuthorsFromStorage, getReferencesFromStorage, getTLDRsFromStorage, messages])
+  }, [rootPaper, initialSuggestions])
 
   // Determine job type based on selections
   const jobType = useMemo(() => {
@@ -341,8 +312,40 @@ export function KeywordSelectionPanel({
 
   const handleSearch = () => {
     if (!jobType) {
-      alert('Please select at least keywords or TLDRs')
+      alert('Please select at least keywords (3-10) or TLDRs (50-5000 characters)')
       return
+    }
+
+    // Validate keywordSearch: need 3-10 keywords
+    if (jobType === 'keywordSearch' && (selectedKeywords.length < 3 || selectedKeywords.length > 10)) {
+      alert(`keywordSearch requires 3-10 keywords. You have selected ${selectedKeywords.length}.`)
+      return
+    }
+
+    // Validate querySearch: need 50-5000 characters in query
+    if (jobType === 'querySearch' && selectedTLDRs.length > 0) {
+      const queryLength = selectedTLDRs.join(' ').length
+      if (queryLength < 50 || queryLength > 5000) {
+        alert(`querySearch requires 50-5000 characters in query. Your query has ${queryLength} characters.`)
+        return
+      }
+    }
+
+    // Validate combinedSearch: need both valid keywords and query
+    if (jobType === 'combinedSearch') {
+      if (selectedKeywords.length < 3 || selectedKeywords.length > 10) {
+        alert(`combinedSearch requires 3-10 keywords. You have selected ${selectedKeywords.length}.`)
+        return
+      }
+      if (selectedTLDRs.length === 0) {
+        alert('combinedSearch requires at least one TLDR to create a query string.')
+        return
+      }
+      const queryLength = selectedTLDRs.join(' ').length
+      if (queryLength < 50 || queryLength > 5000) {
+        alert(`combinedSearch requires 50-5000 characters in query. Your query has ${queryLength} characters.`)
+        return
+      }
     }
 
     const filters: any = {}
@@ -387,12 +390,6 @@ export function KeywordSelectionPanel({
     onOpenChange(false)
   }
 
-  const handleRefresh = () => {
-    if (chatId) {
-      refreshStorage()
-    }
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-[#1f1f1f] border-[#2a2a2a] text-white max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -418,12 +415,38 @@ export function KeywordSelectionPanel({
           {/* Job Type Display */}
           {jobType && (
             <div className="bg-[#171717] border border-[#FF6B35] rounded-md p-3">
-              <p className="text-sm text-gray-300">
+              <p className="text-sm text-gray-300 mb-1">
                 <span className="text-[#FF6B35] font-medium">Job Type:</span> {jobType}
-                {jobType === 'combinedSearch' && ' (TLDR + Keywords)'}
-                {jobType === 'querySearch' && ' (TLDR only)'}
-                {jobType === 'keywordSearch' && ' (Keywords only)'}
               </p>
+              <p className="text-xs text-gray-400">
+                {jobType === 'combinedSearch' && 'Search using both phrases (keywords) and query string (TLDR)'}
+                {jobType === 'querySearch' && 'Search using a query string (TLDR) - requires 50-5000 characters'}
+                {jobType === 'keywordSearch' && 'Search using phrases (keywords) - requires 3-10 phrases'}
+              </p>
+              {jobType === 'keywordSearch' && selectedKeywords.length > 0 && (
+                <p className={`text-xs mt-1 ${selectedKeywords.length >= 3 && selectedKeywords.length <= 10 ? 'text-green-400' : 'text-yellow-400'}`}>
+                  Keywords selected: {selectedKeywords.length} {selectedKeywords.length < 3 ? '(need at least 3)' : selectedKeywords.length > 10 ? '(max 10)' : '(valid)'}
+                </p>
+              )}
+              {jobType === 'querySearch' && selectedTLDRs.length > 0 && (
+                <p className={`text-xs mt-1 ${selectedTLDRs.join(' ').length >= 50 && selectedTLDRs.join(' ').length <= 5000 ? 'text-green-400' : 'text-yellow-400'}`}>
+                  Query length: {selectedTLDRs.join(' ').length} characters {selectedTLDRs.join(' ').length < 50 ? '(need at least 50)' : selectedTLDRs.join(' ').length > 5000 ? '(max 5000)' : '(valid)'}
+                </p>
+              )}
+              {jobType === 'combinedSearch' && (
+                <>
+                  {selectedKeywords.length > 0 && (
+                    <p className={`text-xs mt-1 ${selectedKeywords.length >= 3 && selectedKeywords.length <= 10 ? 'text-green-400' : 'text-yellow-400'}`}>
+                      Keywords: {selectedKeywords.length} {selectedKeywords.length < 3 ? '(need at least 3)' : selectedKeywords.length > 10 ? '(max 10)' : '(valid)'}
+                    </p>
+                  )}
+                  {selectedTLDRs.length > 0 && (
+                    <p className={`text-xs mt-1 ${selectedTLDRs.join(' ').length >= 50 && selectedTLDRs.join(' ').length <= 5000 ? 'text-green-400' : 'text-yellow-400'}`}>
+                      Query: {selectedTLDRs.join(' ').length} chars {selectedTLDRs.join(' ').length < 50 ? '(need at least 50)' : selectedTLDRs.join(' ').length > 5000 ? '(max 5000)' : '(valid)'}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -436,21 +459,12 @@ export function KeywordSelectionPanel({
               </Label>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400">
-                  Storage: {paperCount} papers
+                  {rootPaper ? 'From chat store' : isLoadingRootPaper ? 'Loading...' : 'No root paper'}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleRefresh}
-                  disabled={isLoadingStorage}
-                  className="h-7 px-2 text-gray-400 hover:text-white"
-                >
-                  <RefreshCw className={`h-3 w-3 ${isLoadingStorage ? 'animate-spin' : ''}`} />
-                </Button>
               </div>
             </div>
             <p className="text-sm text-gray-400 mb-3">
-              Select keywords from previous responses or add custom ones
+              Select keywords from the root paper in chat store or add custom ones
             </p>
             
             {/* Selected Keywords */}
@@ -473,7 +487,7 @@ export function KeywordSelectionPanel({
             {/* Suggested Keywords */}
             {suggestedKeywords.length > 0 && (
               <div className="mb-3">
-                <p className="text-xs text-gray-500 mb-2">Suggested from previous papers:</p>
+                <p className="text-xs text-gray-500 mb-2">Suggested from chat store (root paper):</p>
                 <div className="flex flex-wrap gap-2">
                   {suggestedKeywords.map((keyword) => (
                     <Badge
@@ -524,7 +538,7 @@ export function KeywordSelectionPanel({
               TLDR
             </Label>
             <p className="text-sm text-gray-400 mb-3">
-              Select TLDR summaries from previous papers
+              Select TLDR summary from the root paper in chat store
             </p>
             
             {/* Selected TLDRs */}
@@ -547,7 +561,7 @@ export function KeywordSelectionPanel({
             {/* Suggested TLDRs */}
             {suggestedTLDRs.length > 0 && (
               <div>
-                <p className="text-xs text-gray-500 mb-2">Suggested from previous papers:</p>
+                <p className="text-xs text-gray-500 mb-2">Suggested from chat store (root paper):</p>
                 <div className="flex flex-col gap-2 max-h-40 overflow-y-auto">
                   {suggestedTLDRs.map((tldr) => (
                     <Badge
@@ -575,7 +589,7 @@ export function KeywordSelectionPanel({
               Authors
             </Label>
             <p className="text-sm text-gray-400 mb-3">
-              Select authors from previous paper results
+              Select authors from the root paper in chat store
             </p>
             
             {/* Selected Authors */}
@@ -598,7 +612,7 @@ export function KeywordSelectionPanel({
             {/* Suggested Authors */}
             {suggestedAuthors.length > 0 && (
               <div>
-                <p className="text-xs text-gray-500 mb-2">Suggested from previous papers:</p>
+                <p className="text-xs text-gray-500 mb-2">Suggested from chat store (root paper):</p>
                 <div className="flex flex-wrap gap-2">
                   {suggestedAuthors.map((author) => (
                     <Badge
@@ -626,7 +640,7 @@ export function KeywordSelectionPanel({
               References
             </Label>
             <p className="text-sm text-gray-400 mb-3">
-              Select paper titles from previous results
+              Select paper title from the root paper in chat store
             </p>
             
             {/* Selected References */}
@@ -649,7 +663,7 @@ export function KeywordSelectionPanel({
             {/* Suggested References */}
             {suggestedReferences.length > 0 && (
               <div>
-                <p className="text-xs text-gray-500 mb-2">Suggested from previous papers:</p>
+                <p className="text-xs text-gray-500 mb-2">Suggested from chat store (root paper):</p>
                 <div className="flex flex-wrap gap-2">
                   {suggestedReferences.map((ref) => (
                     <Badge
@@ -686,25 +700,48 @@ export function KeywordSelectionPanel({
 
             {showFilters && (
               <div className="mt-4 space-y-4 p-4 bg-[#171717] border border-[#2a2a2a] rounded-md">
-                {/* Fields of Study */}
+                {/* Fields of Study - Dropdown */}
                 <div>
-                  <Label className="text-white text-sm mb-2 block">Fields of Study</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {VALID_FIELDS_OF_STUDY.map((field) => (
-                      <Badge
-                        key={field}
-                        variant="outline"
-                        className={`cursor-pointer border-[#2a2a2a] hover:border-[#FF6B35] ${
-                          selectedFieldsOfStudy.includes(field)
-                            ? 'bg-[#FF6B35] text-white border-[#FF6B35]'
-                            : 'text-gray-300 hover:text-white'
-                        }`}
-                        onClick={() => handleToggleFieldOfStudy(field)}
-                      >
-                        {field}
-                      </Badge>
-                    ))}
-                  </div>
+                  <Label className="text-white text-sm mb-2 block">Fields of Study (Optional)</Label>
+                  <Select 
+                    value={selectedFieldsOfStudy.length > 0 ? selectedFieldsOfStudy[0] : ''} 
+                    onValueChange={(value) => {
+                      if (value && !selectedFieldsOfStudy.includes(value)) {
+                        setSelectedFieldsOfStudy([...selectedFieldsOfStudy, value])
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="bg-[#171717] border-[#2a2a2a] text-white">
+                      <SelectValue placeholder="Select field of study" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {VALID_FIELDS_OF_STUDY.map((field) => (
+                        <SelectItem 
+                          key={field} 
+                          value={field}
+                          disabled={selectedFieldsOfStudy.includes(field)}
+                        >
+                          {field}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {/* Show selected fields as removable badges */}
+                  {selectedFieldsOfStudy.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {selectedFieldsOfStudy.map((field) => (
+                        <Badge
+                          key={field}
+                          variant="secondary"
+                          className="bg-[#FF6B35] text-white hover:bg-[#FF6B35]/80 cursor-pointer"
+                          onClick={() => handleToggleFieldOfStudy(field)}
+                        >
+                          {field}
+                          <X className="ml-1 h-3 w-3" />
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Min Citation Count */}

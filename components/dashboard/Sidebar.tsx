@@ -19,7 +19,8 @@ import {
   Key,
   ChevronDown,
   ChevronUp,
-  Sparkles
+  Sparkles,
+  Bookmark
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,7 +42,6 @@ import {
   SidebarMenuSkeleton,
 } from '@/components/ui/sidebar'
 import { CreateProjectModal } from './CreateProjectModal'
-import { CreateChatModal } from './CreateChatModal'
 import { EditProjectModal } from './EditProjectModal'
 import { EditChatModal } from './EditChatModal'
 import { ProjectsSkeleton } from './ProjectsSkeleton'
@@ -57,11 +57,11 @@ import {
 import { useRouter } from 'next/navigation'
 import { ApiKeySettings } from './ApiKeySettings'
 import { SearchSettings } from './SearchSettings'
+import { BookmarksManagement } from './BookmarksManagement'
 
 interface SidebarProps {
   projects: Array<{ id: string; name: string }>
   chats: Array<{ id: string; title: string; projectId: string; isFavorite?: boolean; updatedAt?: string }>
-  onNewChat: (title: string) => Promise<void>
   onNewProject: (name: string, description?: string) => Promise<void>
   onSelectChat: (chatId: string) => void
   onSelectProject: (projectId: string) => Promise<void>
@@ -80,7 +80,6 @@ interface SidebarProps {
 export function Sidebar({
   projects,
   chats,
-  onNewChat,
   onNewProject,
   onSelectChat,
   onSelectProject,
@@ -98,11 +97,11 @@ export function Sidebar({
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [showProjectModal, setShowProjectModal] = useState(false)
-  const [showChatModal, setShowChatModal] = useState(false)
   const [showEditProjectModal, setShowEditProjectModal] = useState(false)
   const [showEditChatModal, setShowEditChatModal] = useState(false)
   const [showApiKeySettings, setShowApiKeySettings] = useState(false)
   const [showSearchSettings, setShowSearchSettings] = useState(false)
+  const [showBookmarksManagement, setShowBookmarksManagement] = useState(false)
   const [editingProject, setEditingProject] = useState<{ id: string; name: string; description?: string } | null>(null)
   const [editingChat, setEditingChat] = useState<{ id: string; title: string } | null>(null)
 
@@ -143,11 +142,6 @@ export function Sidebar({
   const handleCreateProject = async (name: string, description?: string) => {
     await onNewProject(name, description)
     setShowProjectModal(false)
-  }
-
-  const handleCreateChat = async (title: string) => {
-    await onNewChat(title)
-    setShowChatModal(false)
   }
 
   const handleEditProject = (project: { id: string; name: string; description?: string }) => {
@@ -204,25 +198,6 @@ export function Sidebar({
 
           {/* Quick Actions */}
           <div className="flex gap-2">
-            <SidebarMenuButton
-              onClick={() => {
-                if (projects.length === 0) {
-                  setShowProjectModal(true)
-                  return
-                }
-                if (!selectedProject) {
-                  onSelectProject(projects[0].id)
-                  setTimeout(() => setShowChatModal(true), 100)
-                } else {
-                  setShowChatModal(true)
-                }
-              }}
-              className="flex-1"
-              tooltip={projects.length === 0 ? "Create a project first" : "Create new chat"}
-            >
-              <FileText className="h-4 w-4" />
-              <span>New Chat</span>
-            </SidebarMenuButton>
             <SidebarMenuButton
               onClick={() => setShowProjectModal(true)}
               className="flex-1"
@@ -467,13 +442,6 @@ export function Sidebar({
               <SidebarGroupLabel className="text-sidebar-foreground/70">
                 {projects.find(p => p.id === selectedProject)?.name || 'Project'} Chats
               </SidebarGroupLabel>
-              <SidebarGroupAction
-                onClick={() => setShowChatModal(true)}
-                title="Create new chat"
-              >
-                <Plus className="h-4 w-4" />
-                <span className="sr-only">New Chat</span>
-              </SidebarGroupAction>
               <SidebarGroupContent>
                 {loadingChats ? (
                   <ChatsSkeleton />
@@ -584,6 +552,12 @@ export function Sidebar({
                     <Key className="mr-2 h-4 w-4" />
                     API Settings
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    setShowBookmarksManagement(true)
+                  }}>
+                    <Bookmark className="mr-2 h-4 w-4" />
+                    Bookmarks
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-destructive">
                     <LogOut className="mr-2 h-4 w-4" />
@@ -601,13 +575,6 @@ export function Sidebar({
         open={showProjectModal}
         onOpenChange={setShowProjectModal}
         onCreateProject={handleCreateProject}
-      />
-      <CreateChatModal
-        open={showChatModal}
-        onOpenChange={setShowChatModal}
-        onCreateChat={handleCreateChat}
-        projectName={projects.find(p => p.id === selectedProject)?.name}
-        projectId={selectedProject}
       />
       <EditProjectModal
         open={showEditProjectModal}
@@ -628,6 +595,10 @@ export function Sidebar({
       <SearchSettings
         open={showSearchSettings}
         onOpenChange={setShowSearchSettings}
+      />
+      <BookmarksManagement
+        open={showBookmarksManagement}
+        onOpenChange={setShowBookmarksManagement}
       />
     </ShadcnSidebar>
   )

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Mic, MicOff, Plus, FileText, Network, ThumbsUp, ThumbsDown, Copy, RotateCcw } from 'lucide-react'
+import { Send, Mic, MicOff, Plus, FileText, Network, ThumbsUp, ThumbsDown, Copy, RotateCcw, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,11 +10,14 @@ import { PaperSearchResults } from './PaperSearchResults'
 import { CitationNetworkEnhanced as CitationNetwork } from './CitationNetworkEnhanced'
 import { CitationTree } from './CitationTree'
 import { KeywordSelectionPanel } from './KeywordSelectionPanel'
+import { CitationTreeVisualization } from './CitationTreeVisualization'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { LoadingOverlay } from '@/components/ui/loading-overlay'
 import { VeritusPaper } from '@/types/veritus'
 import { CitationNetworkResponse } from '@/types/paper-api'
 import { shouldUseMockData } from '@/lib/config/mock-config'
 import { MessagesSkeleton } from './MessagesSkeleton'
+import { NodeTransferPayload } from '@/types/graph-node'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -33,9 +36,14 @@ interface ChatInterfaceProps {
   onDepthChange?: (depth: number) => void
   onCitationNetwork?: (response: CitationNetworkResponse) => void
   loadingMessages?: boolean
+  onCreateChatFromNode?: (
+    paper: VeritusPaper,
+    selectedFields?: Map<string, string>,
+    nodeContext?: NodeTransferPayload
+  ) => Promise<string | null>
 }
 
-export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage, onAddAssistantMessage, onDepthChange, onCitationNetwork, loadingMessages = false }: ChatInterfaceProps) {
+export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage, onAddAssistantMessage, onDepthChange, onCitationNetwork, loadingMessages = false, onCreateChatFromNode }: ChatInterfaceProps) {
   const [input, setInput] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [showPaperSearch, setShowPaperSearch] = useState(false)
@@ -47,6 +55,8 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
   const [showKeywordSelectionPanel, setShowKeywordSelectionPanel] = useState(false)
   const [loadingCitationNetwork, setLoadingCitationNetwork] = useState(false)
   const [currentCorpusId, setCurrentCorpusId] = useState<string | null>(null)
+  const [showCitationTreeModal, setShowCitationTreeModal] = useState(false)
+  const [citationNetworkResponse, setCitationNetworkResponse] = useState<CitationNetworkResponse | undefined>(undefined)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
   // Determine if mock mode should be used (configurable via environment or defaults)
@@ -85,6 +95,20 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
             setCurrentCorpusId(paper.id)
             break
           }
+        }
+      }
+    }
+  }, [messages])
+
+  // Extract the most recent citation network response from messages
+  useEffect(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const message = messages[i]
+      if (message && message.citationNetwork) {
+        const network = message.citationNetwork
+        if (typeof network === 'object' && 'paper' in network && 'citationNetwork' in network) {
+          setCitationNetworkResponse(network as CitationNetworkResponse)
+          break
         }
       }
     }
@@ -210,54 +234,66 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
     }
   }
 
-  const handleGenerateCitationNetwork = async (params: {
-    corpusId: string
-    depth: number
-    simple: boolean
-    keywords: string[]
-    authors: string[]
-    references: string[]
+  const handleGenerateCitationNetwork = async (filters?: {
+    sortBy?: 'relevance' | 'citations' | 'year' | 'title'
+    sortOrder?: 'asc' | 'desc'
+    minCitations?: number
+    maxCitations?: number
+    minYear?: number
+    maxYear?: number
+    fieldsOfStudy?: string[]
+    authors?: string[]
+    publicationTypes?: string[]
+    limit?: number
   }) => {
     if (!chatId) return
 
     setLoadingCitationNetwork(true)
     
-    // Add explanatory message before generating the network
-    const paramDetails: string[] = []
-    if (params.keywords.length > 0) {
-      paramDetails.push(`${params.keywords.length} keyword${params.keywords.length !== 1 ? 's' : ''}`)
-    }
-    if (params.authors.length > 0) {
-      paramDetails.push(`${params.authors.length} author${params.authors.length !== 1 ? 's' : ''}`)
-    }
-    if (params.references.length > 0) {
-      paramDetails.push(`${params.references.length} reference${params.references.length !== 1 ? 's' : ''}`)
-    }
-    
-    const preGenerationContent = `Generating citation network${params.simple ? ' (Simple Mode - Semantic Similarity)' : ' (Full Mode - Citation Network)'}...\n\n${paramDetails.length > 0 ? `Using: ${paramDetails.join(', ')}` : 'Using default parameters'}\n\nThis may take a few moments.`
-    
-    // Add user message requesting the network
-    onSendMessage(
-      `Generate citation network${params.simple ? ' (simple mode)' : ' (full mode)'}${paramDetails.length > 0 ? ` with ${paramDetails.join(', ')}` : ''}`,
-      undefined,
-      undefined
-    )
-    
-    // Add pre-generation explanation as assistant message
-    if (onAddAssistantMessage) {
-      onAddAssistantMessage(preGenerationContent)
-    }
-    
     try {
-      const response = await fetch('/api/paper/citation-network', {
+      // Build query parameters
+      const queryParams = new URLSearchParams()
+      queryParams.set('chatId', chatId)
+      
+      if (filters?.sortBy) {
+        queryParams.set('sortBy', filters.sortBy)
+      }
+      if (filters?.sortOrder) {
+        queryParams.set('sortOrder', filters.sortOrder)
+      }
+      if (filters?.minCitations !== undefined) {
+        queryParams.set('minCitations', filters.minCitations.toString())
+      }
+      if (filters?.maxCitations !== undefined) {
+        queryParams.set('maxCitations', filters.maxCitations.toString())
+      }
+      if (filters?.minYear !== undefined) {
+        queryParams.set('minYear', filters.minYear.toString())
+      }
+      if (filters?.maxYear !== undefined) {
+        queryParams.set('maxYear', filters.maxYear.toString())
+      }
+      if (filters?.fieldsOfStudy && filters.fieldsOfStudy.length > 0) {
+        queryParams.set('fieldsOfStudy', filters.fieldsOfStudy.join(','))
+      }
+      if (filters?.authors && filters.authors.length > 0) {
+        queryParams.set('authors', filters.authors.join(','))
+      }
+      if (filters?.publicationTypes && filters.publicationTypes.length > 0) {
+        queryParams.set('publicationTypes', filters.publicationTypes.join(','))
+      }
+      if (filters?.limit !== undefined) {
+        queryParams.set('limit', filters.limit.toString())
+      }
+
+      // Add explanatory message before generating the network
+      if (onAddAssistantMessage) {
+        onAddAssistantMessage('Generating citation network from papers in chat...')
+      }
+
+      const response = await fetch(`/api/citation-network?${queryParams.toString()}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...params,
-          chatId,
-          isMocked: useMock, // Use configurable mock mode
-          sortBy: 'relevance', // Default sort by relevance
-        }),
       })
 
       if (!response.ok) {
@@ -275,23 +311,20 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
       // Also add as a message
       const networkMessage = {
         role: 'assistant' as const,
-        content: `Citation network generated${params.simple ? ' (Simple Mode)' : ' (Full Mode)'}:\n\n${params.simple ? `Found ${data.similarPapers?.length || 0} similar papers` : `Network with ${data.citationNetwork?.stats.totalNodes || 0} nodes and ${data.citationNetwork?.stats.totalEdges || 0} edges`}`,
+        content: `Citation network generated:\n\nNetwork with ${data.citationNetwork?.stats.totalNodes || 0} nodes (${data.citationNetwork?.stats.paperNodes || 0} papers, ${data.citationNetwork?.stats.childNodes || 0} child nodes) and ${data.citationNetwork?.stats.totalEdges || 0} edges`,
         timestamp: new Date(),
-        papers: params.simple && data.similarPapers ? [data.paper, ...data.similarPapers] : [data.paper],
+        papers: [data.paper],
         citationNetwork: data,
       }
 
       onSendMessage(
-        `Generated citation network${params.simple ? ' (simple mode)' : ' (full mode)'}`,
+        'Generated citation network',
         networkMessage.papers,
         networkMessage.citationNetwork
       )
 
       // Force refresh of messages after network generation
-      // This ensures CitationNetworkSelector sees the updated messages
       if (chatId) {
-        // Trigger a re-render by updating a state that causes messages to refresh
-        // The parent component should handle this via loadChatMessages
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('chat-messages-updated', { detail: { chatId } }))
         }, 100)
@@ -299,6 +332,9 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
     } catch (error: any) {
       console.error('Error generating citation network:', error)
       setSearchError(error.message || 'Failed to generate citation network')
+      if (onAddAssistantMessage) {
+        onAddAssistantMessage(`Error: ${error.message || 'Failed to generate citation network'}`)
+      }
     } finally {
       setLoadingCitationNetwork(false)
     }
@@ -512,32 +548,36 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
                 {/* Show citation network if present */}
                 {message.citationNetwork && (
                   <div className="mt-4">
-                    <CitationTree 
-                      citationNetworkResponse={typeof message.citationNetwork === 'object' && 'paper' in message.citationNetwork ? message.citationNetwork : undefined}
-                      chatId={chatId}
-                      messages={messages}
-                      onExpandNode={async (nodeId: string) => {
-                        try {
-                          const response = await fetch('/api/paper/citation-network', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              corpusId: nodeId,
-                              depth: chatDepth || 50,
-                              chatId,
-                              isMocked: useMock,
-                              sortBy: 'relevance',
-                            }),
-                          })
-                          if (response.ok) {
-                            return await response.json()
-                          }
-                        } catch (error) {
-                          console.error('Error expanding node:', error)
-                        }
-                        return null
-                      }}
-                    />
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <CitationTree 
+                          citationNetworkResponse={typeof message.citationNetwork === 'object' && 'paper' in message.citationNetwork ? message.citationNetwork : undefined}
+                          chatId={chatId}
+                          messages={messages}
+                          onExpandNode={async (nodeId: string) => {
+                            try {
+                              const response = await fetch('/api/paper/citation-network', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  corpusId: nodeId,
+                                  depth: chatDepth || 50,
+                                  chatId,
+                                  isMocked: useMock,
+                                  sortBy: 'relevance',
+                                }),
+                              })
+                              if (response.ok) {
+                                return await response.json()
+                              }
+                            } catch (error) {
+                              console.error('Error expanding node:', error)
+                            }
+                            return null
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -557,6 +597,16 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
       {/* Input Area */}
       <div className="border-t border-border p-4 bg-background flex-shrink-0">
         <div className="flex gap-2 mb-2 flex-wrap items-center">
+          <Button
+            type="button"
+            onClick={() => setShowCitationTreeModal(true)}
+            variant="outline"
+            className="text-xs"
+            title="View Citation Tree Visualization"
+          >
+            <Network className="mr-2 h-3 w-3" />
+            Citation Network
+          </Button>
           <Button
             type="button"
             onClick={() => setShowKeywordSelectionPanel(true)}
@@ -639,6 +689,37 @@ export function ChatInterface({ chatId, messages, chatDepth = 100, onSendMessage
         depth={depth}
         onSearch={handleSearchSimilarPapers}
       />
+
+      {/* Citation Tree Visualization Modal */}
+      <Dialog open={showCitationTreeModal} onOpenChange={setShowCitationTreeModal}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-[95vw] h-[95vh] p-0 flex flex-col">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b border-border flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg font-semibold text-foreground">
+                Citation Tree Visualization
+              </DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowCitationTreeModal(false)}
+                className="h-6 w-6"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto p-6 min-h-0 h-full">
+            <div className="h-full w-full">
+              <CitationTreeVisualization 
+                citationNetworkResponse={citationNetworkResponse}
+                chatId={chatId}
+                messages={messages}
+                onCreateChatFromNode={onCreateChatFromNode}
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Loading Overlay */}
       <LoadingOverlay
