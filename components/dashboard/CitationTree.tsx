@@ -47,9 +47,10 @@ interface CitationTreeProps {
     selectedFields?: Map<string, string>,
     nodeContext?: NodeTransferPayload
   ) => Promise<string | null>
+  onCreateChatFromHeading?: (title: string) => Promise<string | null>
 }
 
-export function CitationTree({ citationNetworkResponse, chatId, messages, onNodeClick, onExpandNode, onCreateChatFromNode }: CitationTreeProps) {
+export function CitationTree({ citationNetworkResponse, chatId, messages, onNodeClick, onExpandNode, onCreateChatFromNode, onCreateChatFromHeading }: CitationTreeProps) {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set())
   const [expandedData, setExpandedData] = useState<Map<string, TreeNode[]>>(new Map())
@@ -662,6 +663,7 @@ export function CitationTree({ citationNetworkResponse, chatId, messages, onNode
         paper={popoverPaper}
         open={popoverOpen}
         onOpenChange={setPopoverOpen}
+        onCreateChatFromHeading={onCreateChatFromHeading}
       />
     </div>
   )

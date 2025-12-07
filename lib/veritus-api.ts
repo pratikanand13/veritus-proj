@@ -1,6 +1,32 @@
 import { VeritusPaper, VeritusJobResponse, VeritusJobStatus, VeritusCredits } from '@/types/veritus'
 
 const VERITUS_BASE_URL = 'https://discover.veritus.ai/api'
+const VERITUS_LOG_ENABLED =
+  process.env.VERITUS_API_LOG === 'true' || process.env.DEBUG === 'true'
+
+function logVeritusApi(event: string, payload: Record<string, any>) {
+  if (!VERITUS_LOG_ENABLED) return
+  try {
+    // Avoid logging sensitive data like api keys
+    const sanitized = { ...payload }
+    delete (sanitized as any).apiKey
+    // Trim large arrays to keep logs readable
+    if (Array.isArray(sanitized.dataPreview)) {
+      sanitized.dataPreview = sanitized.dataPreview.slice(0, 3)
+    }
+    console.info(`[veritus-api] ${event}`, sanitized)
+  } catch (error) {
+    console.info(`[veritus-api] ${event} (log failed)`, { error })
+  }
+}
+
+async function parseJsonSafe(response: Response) {
+  try {
+    return await response.json()
+  } catch {
+    return null
+  }
+}
 
 export interface VeritusApiOptions {
   apiKey: string
@@ -37,6 +63,7 @@ export async function searchPapers(
   params: SearchPapersParams,
   options: VeritusApiOptions
 ): Promise<VeritusPaper[]> {
+  const start = Date.now()
   const url = new URL(`${VERITUS_BASE_URL}/v1/papers/search`)
   url.searchParams.set('title', params.title)
 
@@ -47,12 +74,29 @@ export async function searchPapers(
     },
   })
 
+  const json = await parseJsonSafe(response)
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-    throw new Error(error.error || `HTTP ${response.status}`)
+    logVeritusApi('searchPapers.error', {
+      url: url.toString(),
+      params,
+      status: response.status,
+      durationMs: Date.now() - start,
+      error: json,
+    })
+    throw new Error((json as any)?.error || `HTTP ${response.status}`)
   }
 
-  return response.json()
+  logVeritusApi('searchPapers.success', {
+    url: url.toString(),
+    params,
+    status: response.status,
+    durationMs: Date.now() - start,
+    total: Array.isArray(json) ? json.length : undefined,
+    dataPreview: Array.isArray(json) ? json : json,
+  })
+
+  return json as VeritusPaper[]
 }
 
 /**
@@ -62,6 +106,7 @@ export async function getPaper(
   corpusId: string,
   options: VeritusApiOptions
 ): Promise<VeritusPaper> {
+  const start = Date.now()
   const response = await fetch(`${VERITUS_BASE_URL}/v1/papers/${corpusId}`, {
     method: 'GET',
     headers: {
@@ -69,12 +114,26 @@ export async function getPaper(
     },
   })
 
+  const json = await parseJsonSafe(response)
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-    throw new Error(error.error || `HTTP ${response.status}`)
+    logVeritusApi('getPaper.error', {
+      corpusId,
+      status: response.status,
+      durationMs: Date.now() - start,
+      error: json,
+    })
+    throw new Error((json as any)?.error || `HTTP ${response.status}`)
   }
 
-  return response.json()
+  logVeritusApi('getPaper.success', {
+    corpusId,
+    status: response.status,
+    durationMs: Date.now() - start,
+    dataPreview: json,
+  })
+
+  return json as VeritusPaper
 }
 
 /**
@@ -85,6 +144,7 @@ export async function createJob(
   body: CreateJobBody,
   options: VeritusApiOptions
 ): Promise<VeritusJobResponse> {
+  const start = Date.now()
   const url = new URL(`${VERITUS_BASE_URL}/v1/job/${params.jobType}`)
 
   // Add query parameters
@@ -107,12 +167,71 @@ export async function createJob(
     body: JSON.stringify(body),
   })
 
+  const json = await parseJsonSafe(response)
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-    throw new Error(error.error || `HTTP ${response.status}`)
+    logVeritusApi('createJob.error', {
+      jobType: params.jobType,
+      url: url.toString(),
+      params,
+      body,
+      status: response.status,
+      durationMs: Date.now() - start,
+      error: json,
+    })
+    // Extract error message properly to handle various error formats
+    let errorMessage = `HTTP ${response.status}`
+    if (json) {
+      if (typeof json === 'string') {
+        errorMessage = json
+      } else if (Array.isArray(json)) {
+        // Handle array of error objects (e.g., validation errors)
+        const errorMessages = json
+          .map((e: any) => {
+            if (typeof e === 'string') return e
+            if (e?.message) return e.message
+            if (e?.error) return typeof e.error === 'string' ? e.error : String(e.error)
+            return null
+          })
+          .filter(Boolean)
+        errorMessage = errorMessages.length > 0 
+          ? errorMessages.join('. ') 
+          : 'Validation error occurred'
+      } else if ((json as any)?.error) {
+        // Handle nested error objects
+        if (Array.isArray((json as any).error)) {
+          const errorMessages = (json as any).error
+            .map((e: any) => {
+              if (typeof e === 'string') return e
+              if (e?.message) return e.message
+              return null
+            })
+            .filter(Boolean)
+          errorMessage = errorMessages.length > 0 
+            ? errorMessages.join('. ') 
+            : 'Validation error occurred'
+        } else {
+          errorMessage = typeof (json as any).error === 'string' 
+            ? (json as any).error 
+            : JSON.stringify((json as any).error)
+        }
+      } else if ((json as any)?.message) {
+        errorMessage = String((json as any).message)
+      }
+    }
+    throw new Error(errorMessage)
   }
 
-  return response.json()
+  logVeritusApi('createJob.success', {
+    jobType: params.jobType,
+    url: url.toString(),
+    params,
+    status: response.status,
+    durationMs: Date.now() - start,
+    dataPreview: json,
+  })
+
+  return json as VeritusJobResponse
 }
 
 /**
@@ -122,6 +241,7 @@ export async function getJobStatus(
   jobId: string,
   options: VeritusApiOptions
 ): Promise<VeritusJobStatus> {
+  const start = Date.now()
   const response = await fetch(`${VERITUS_BASE_URL}/v1/job/${jobId}`, {
     method: 'GET',
     headers: {
@@ -129,12 +249,26 @@ export async function getJobStatus(
     },
   })
 
+  const json = await parseJsonSafe(response)
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-    throw new Error(error.error || `HTTP ${response.status}`)
+    logVeritusApi('getJobStatus.error', {
+      jobId,
+      status: response.status,
+      durationMs: Date.now() - start,
+      error: json,
+    })
+    throw new Error((json as any)?.error || `HTTP ${response.status}`)
   }
 
-  return response.json()
+  logVeritusApi('getJobStatus.success', {
+    jobId,
+    status: response.status,
+    durationMs: Date.now() - start,
+    dataPreview: json,
+  })
+
+  return json as VeritusJobStatus
 }
 
 /**
@@ -143,6 +277,7 @@ export async function getJobStatus(
 export async function getCredits(
   options: VeritusApiOptions
 ): Promise<VeritusCredits> {
+  const start = Date.now()
   const response = await fetch(`${VERITUS_BASE_URL}/v1/user/getCredits`, {
     method: 'GET',
     headers: {
@@ -150,11 +285,23 @@ export async function getCredits(
     },
   })
 
+  const json = await parseJsonSafe(response)
+
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Unknown error' }))
-    throw new Error(error.error || `HTTP ${response.status}`)
+    logVeritusApi('getCredits.error', {
+      status: response.status,
+      durationMs: Date.now() - start,
+      error: json,
+    })
+    throw new Error((json as any)?.error || `HTTP ${response.status}`)
   }
 
-  return response.json()
+  logVeritusApi('getCredits.success', {
+    status: response.status,
+    durationMs: Date.now() - start,
+    dataPreview: json,
+  })
+
+  return json as VeritusCredits
 }
 

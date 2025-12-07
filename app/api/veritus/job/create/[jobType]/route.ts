@@ -3,6 +3,8 @@ import { getCurrentUser } from '@/lib/auth'
 import { getVeritusApiKey } from '@/lib/veritus-auth'
 import { createJob } from '@/lib/veritus-api'
 import { isDebugMode } from '@/lib/config/mock-config'
+import connectDB from '@/lib/db'
+import Chat from '@/models/Chat'
 
 export async function POST(
   request: Request,
@@ -41,6 +43,64 @@ export async function POST(
     const apiKey = await getVeritusApiKey()
     const { searchParams } = new URL(request.url)
     const body = await request.json()
+
+    // Pad phrases array if needed (Veritus API requires minimum 3 phrases)
+    // When user selects only 1-2 keywords, we pad with paper metadata from chatstore
+    if ((jobType === 'keywordSearch' || jobType === 'combinedSearch') && body.phrases && Array.isArray(body.phrases)) {
+      const originalPhrases = body.phrases
+      if (originalPhrases.length > 0 && originalPhrases.length < 3) {
+        const chatId = searchParams.get('chatId') || body.chatId
+        let paddedPhrases = [...originalPhrases]
+        
+        if (chatId) {
+          try {
+            await connectDB()
+            const chat = await Chat.findOne({ _id: chatId, userId: user.userId })
+            if (chat?.chatMetadata?.paperData) {
+              const paperData = chat.chatMetadata.paperData
+              
+              // Add paper title if not already in phrases
+              if (paperData.title && !paddedPhrases.some(p => p.toLowerCase() === paperData.title.toLowerCase())) {
+                paddedPhrases.push(paperData.title)
+              }
+              
+              // Add fields of study if available
+              if (paperData.fieldsOfStudy && Array.isArray(paperData.fieldsOfStudy)) {
+                for (const field of paperData.fieldsOfStudy) {
+                  if (paddedPhrases.length >= 3) break
+                  if (field && !paddedPhrases.some(p => p.toLowerCase() === field.toLowerCase())) {
+                    paddedPhrases.push(field)
+                  }
+                }
+              }
+              
+              // Add publication type if available
+              if (paperData.publicationType && paddedPhrases.length < 3) {
+                if (!paddedPhrases.some(p => p.toLowerCase() === paperData.publicationType.toLowerCase())) {
+                  paddedPhrases.push(paperData.publicationType)
+                }
+              }
+            }
+          } catch (error) {
+            // If we can't get paper data, log but continue
+            // We'll check if padding was successful below
+          }
+        }
+        
+        // If still less than 3 after padding attempt, return a helpful error
+        if (paddedPhrases.length < 3) {
+          return NextResponse.json(
+            { 
+              error: `Veritus API requires at least 3 phrases for ${jobType}. You provided ${originalPhrases.length} keyword(s). Please select more keywords or ensure chat has paper data for automatic padding.` 
+            },
+            { status: 400 }
+          )
+        }
+        
+        // Update body with padded phrases (now has at least 3)
+        body.phrases = paddedPhrases
+      }
+    }
 
     const jobParams: any = {}
     if (searchParams.get('limit')) {
@@ -82,10 +142,30 @@ export async function POST(
 
     return NextResponse.json(result)
   } catch (error: any) {
-    console.error('Error creating job:', error)
+    // Extract error message properly to avoid "[object Object]"
+    let errorMessage = 'Failed to create job'
+    let statusCode = 500
+    
+    if (error instanceof Error) {
+      errorMessage = error.message || errorMessage
+    } else if (typeof error === 'string') {
+      errorMessage = error
+    } else if (error?.message) {
+      errorMessage = String(error.message)
+    } else if (error?.error) {
+      errorMessage = typeof error.error === 'string' ? error.error : String(error.error)
+    }
+    
+    // Determine status code
+    if (errorMessage.includes('Unauthorized')) {
+      statusCode = 401
+    } else if (errorMessage.includes('Insufficient')) {
+      statusCode = 403
+    }
+    
     return NextResponse.json(
-      { error: error.message || 'Failed to create job' },
-      { status: error.message?.includes('Unauthorized') ? 401 : error.message?.includes('Insufficient') ? 403 : 500 }
+      { error: errorMessage },
+      { status: statusCode }
     )
   }
 }

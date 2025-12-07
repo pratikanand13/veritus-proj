@@ -11,6 +11,8 @@ import { SearchLoadingSkeleton } from './SearchLoadingSkeleton'
 import { VeritusPaper } from '@/types/veritus'
 import { CitationNetworkResponse } from '@/types/paper-api'
 import { NodeTransferPayload } from '@/types/graph-node'
+import { isDebugMode } from '@/lib/config/mock-config'
+import { toast } from '@/lib/utils/toast'
 
 interface PaperChatViewProps {
   chatId: string
@@ -21,6 +23,7 @@ interface PaperChatViewProps {
     selectedFields?: Map<string, string>,
     nodeContext?: NodeTransferPayload
   ) => Promise<string | null>
+  onCreateChatFromHeading?: (title: string) => Promise<string | null>
 }
 
 const formatDate = (value?: string | null) => {
@@ -109,6 +112,7 @@ export function PaperChatView({
   projectId,
   chatDepth = 100,
   onCreateChatFromNode,
+  onCreateChatFromHeading,
 }: PaperChatViewProps) {
   const [paperData, setPaperData] = useState<any>(null)
   const [searchResults, setSearchResults] = useState<VeritusPaper[]>([])
@@ -282,6 +286,9 @@ export function PaperChatView({
     try {
       // Build query parameters for job creation
       const queryParams = new URLSearchParams()
+      if (chatId) {
+        queryParams.set('chatId', chatId) // Pass chatId for phrase padding
+      }
       if (params.filters?.limit) {
         queryParams.set('limit', params.filters.limit.toString())
       }
@@ -343,14 +350,17 @@ export function PaperChatView({
       }
 
       // Step 2: Poll job status (show loading skeleton with quotes)
+      // For mock mode: 3 second timeout, for real API: 60 second timeout (default)
+      const isMock = isDebugMode() || jobId.startsWith('mock-job-')
       let attempts = 0
-      const maxAttempts = 30 // 30 attempts * 2 seconds = 60 seconds max
+      const maxAttempts = isMock ? 2 : 30 // Mock: 2 attempts * 1.5s ≈ 3s, Real: 30 attempts * 2s = 60s
+      const pollInterval = isMock ? 1500 : 2000 // Mock: 1.5s, Real: 2s
       let jobStatus: any = null
       let papers: VeritusPaper[] = []
 
       while (attempts < maxAttempts) {
-        // Wait 2 seconds before checking status
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        // Wait before checking status
+        await new Promise(resolve => setTimeout(resolve, pollInterval))
 
         const statusResponse = await fetch(`/api/veritus/job/${jobId}`)
         if (!statusResponse.ok) {
@@ -369,8 +379,21 @@ export function PaperChatView({
         attempts++
       }
 
+      // Check if we timed out or got results
       if (!papers || papers.length === 0) {
-        throw new Error('Search timed out or returned no results')
+        if (isMock) {
+          throw new Error('Search timed out or returned no results')
+        } else {
+          // For real API, check final status to see if still processing
+          const finalStatusResponse = await fetch(`/api/veritus/job/${jobId}`)
+          if (finalStatusResponse.ok) {
+            const finalStatus = await finalStatusResponse.json()
+            if (finalStatus.status === 'queued' || finalStatus.status === 'processing') {
+              throw new Error('Search timed out after 60 seconds. The job is still processing. Please try again later.')
+            }
+          }
+          throw new Error('Search timed out after 60 seconds or returned no results')
+        }
       }
 
       // Step 3: Store papers in chat via search-papers API
@@ -447,8 +470,58 @@ export function PaperChatView({
         }
       }
     } catch (error: any) {
-      console.error('Error searching similar papers:', error)
-      alert(`Error: ${error.message || 'Failed to search similar papers'}`)
+      // Extract error message properly to avoid "[object Object]"
+      let errorMessage = 'Failed to search similar papers'
+      
+      // Handle different error formats
+      if (error instanceof Error) {
+        errorMessage = error.message || errorMessage
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      } else if (Array.isArray(error)) {
+        // Handle array of error objects (e.g., validation errors)
+        const errorMessages = error
+          .map((e: any) => {
+            if (typeof e === 'string') return e
+            if (e?.message) return e.message
+            if (e?.error) return typeof e.error === 'string' ? e.error : String(e.error)
+            return null
+          })
+          .filter(Boolean)
+        errorMessage = errorMessages.length > 0 
+          ? errorMessages.join('. ') 
+          : 'Validation error occurred'
+      } else if (error?.message) {
+        errorMessage = String(error.message)
+      } else if (error?.error) {
+        // Handle nested error objects
+        if (Array.isArray(error.error)) {
+          const errorMessages = error.error
+            .map((e: any) => {
+              if (typeof e === 'string') return e
+              if (e?.message) return e.message
+              return null
+            })
+            .filter(Boolean)
+          errorMessage = errorMessages.length > 0 
+            ? errorMessages.join('. ') 
+            : 'Validation error occurred'
+        } else {
+          errorMessage = typeof error.error === 'string' ? error.error : String(error.error)
+        }
+      } else if (error) {
+        // Try to get a meaningful string representation
+        try {
+          if (typeof error === 'object' && error.toString && error.toString() !== '[object Object]') {
+            errorMessage = error.toString()
+          } else {
+            errorMessage = 'An unexpected error occurred'
+          }
+        } catch {
+          errorMessage = 'An unexpected error occurred'
+        }
+      }
+      toast.error('Failed to search similar papers', errorMessage)
     } finally {
       setLoadingSearch(false)
     }
@@ -475,8 +548,29 @@ export function PaperChatView({
       const data: CitationNetworkResponse = await response.json()
       setCitationNetworkResponse(data)
     } catch (error: any) {
-      console.error('Error generating citation network:', error)
-      alert(`Error: ${error.message || 'Failed to generate citation network'}`)
+      // Extract error message properly to avoid "[object Object]"
+      let errorMessage = 'Failed to generate citation network'
+      if (error instanceof Error) {
+        errorMessage = error.message || errorMessage
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      } else if (error?.message) {
+        errorMessage = String(error.message)
+      } else if (error?.error) {
+        errorMessage = typeof error.error === 'string' ? error.error : String(error.error)
+      } else if (error) {
+        // Try to get a meaningful string representation
+        try {
+          if (typeof error === 'object' && error.toString && error.toString() !== '[object Object]') {
+            errorMessage = error.toString()
+          } else {
+            errorMessage = 'An unexpected error occurred'
+          }
+        } catch {
+          errorMessage = 'An unexpected error occurred'
+        }
+      }
+      toast.error('Failed to generate citation network', errorMessage)
     } finally {
       setLoadingCitationNetwork(false)
     }
@@ -539,7 +633,17 @@ export function PaperChatView({
               </Button>
             </div>
             <div className="flex flex-col gap-2">
-              <h1 className="text-3xl font-semibold leading-tight text-white">{paperData.title}</h1>
+              <h1 
+                className="text-3xl font-semibold leading-tight text-white cursor-pointer hover:text-[#22c55e] transition-colors"
+                onClick={() => {
+                  if (onCreateChatFromHeading && paperData?.title) {
+                    onCreateChatFromHeading(paperData.title)
+                  }
+                }}
+                title="Click to create a new chat with this paper title"
+              >
+                {paperData.title}
+              </h1>
               <p className="text-base text-slate-200">{formatValue(paperData.authors)}</p>
               <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
                 <span>{formatValue(paperData.year)}</span>
@@ -743,7 +847,10 @@ export function PaperChatView({
               <h2 className="text-xl font-semibold text-foreground mb-4">
                 Found {searchResults.length} similar papers
               </h2>
-              <PaperAccordion papers={searchResults} />
+              <PaperAccordion 
+                papers={searchResults} 
+                onCreateChatFromHeading={onCreateChatFromHeading}
+              />
             </div>
           )}
 
@@ -776,6 +883,7 @@ export function PaperChatView({
               <h2 className="text-xl font-semibold text-foreground mb-4">Citation Network</h2>
               <div className="pt-2">
                 <CitationTree
+                  onCreateChatFromHeading={onCreateChatFromHeading}
                   citationNetworkResponse={citationNetworkResponse}
                   chatId={chatId}
                   messages={messages}

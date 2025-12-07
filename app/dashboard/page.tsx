@@ -10,6 +10,7 @@ import { Header } from '@/components/dashboard/Header'
 import { PaperSearchPage } from '@/components/dashboard/PaperSearchPage'
 import { PaperChatView } from '@/components/dashboard/PaperChatView'
 import { shouldUseMockData } from '@/lib/config/mock-config'
+import { toast } from '@/lib/utils/toast'
 
 interface User {
   id: string
@@ -131,8 +132,8 @@ export default function DashboardPage() {
         }))
         setProjects(projectsWithIds)
       }
-    } catch (error) {
-      console.error('Error loading projects:', error)
+    } catch (error: any) {
+      toast.error('Failed to load projects', error?.message || 'An unexpected error occurred')
     } finally {
       setLoadingProjects(false)
     }
@@ -154,8 +155,8 @@ export default function DashboardPage() {
         }))
         setChats(transformedChats)
       }
-    } catch (error) {
-      console.error('Error loading chats:', error)
+    } catch (error: any) {
+      toast.error('Failed to load chats', error?.message || 'An unexpected error occurred')
     } finally {
       setLoadingChats(false)
     }
@@ -175,8 +176,8 @@ export default function DashboardPage() {
         const hasPapersInMessages = messages.some((msg: any) => msg.papers && Array.isArray(msg.papers) && msg.papers.length > 0)
         setCurrentChatHasPaperData(hasPaperData || hasPapersInMessages)
       }
-    } catch (error) {
-      console.error('Error loading chat messages:', error)
+    } catch (error: any) {
+      toast.error('Failed to load messages', error?.message || 'An unexpected error occurred')
     } finally {
       setLoadingMessages(false)
     }
@@ -199,8 +200,8 @@ export default function DashboardPage() {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Failed to create project')
       }
-    } catch (error) {
-      console.error('Error creating project:', error)
+    } catch (error: any) {
+      toast.error('Failed to create project', error?.message || 'An unexpected error occurred')
       throw error
     }
   }
@@ -224,11 +225,11 @@ export default function DashboardPage() {
         await loadProjects()
       } else {
         const errorData = await response.json()
-        console.error('Update project error response:', errorData)
+        toast.error('Failed to update project', errorData.error || 'An unexpected error occurred')
         throw new Error(errorData.error || 'Failed to update project')
       }
     } catch (error: any) {
-      console.error('Error updating project:', error)
+      toast.error('Failed to update project', error?.message || 'An unexpected error occurred')
       throw error
     }
   }
@@ -246,8 +247,8 @@ export default function DashboardPage() {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Failed to update chat')
       }
-    } catch (error) {
-      console.error('Error updating chat:', error)
+    } catch (error: any) {
+      toast.error('Failed to update chat', error?.message || 'An unexpected error occurred')
       throw error
     }
   }
@@ -268,8 +269,8 @@ export default function DashboardPage() {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Failed to delete project')
       }
-    } catch (error) {
-      console.error('Error deleting project:', error)
+    } catch (error: any) {
+      toast.error('Failed to delete project', error?.message || 'An unexpected error occurred')
       throw error
     }
   }
@@ -312,11 +313,11 @@ export default function DashboardPage() {
         return data.chat.id as string
       } else {
         const errorData = await response.json()
-        console.error('Create chat error response:', errorData)
+        toast.error('Failed to create chat', errorData.error || 'An unexpected error occurred')
         throw new Error(errorData.error || 'Failed to create chat')
       }
     } catch (error: any) {
-      console.error('Error creating chat:', error)
+      toast.error('Failed to create chat', error?.message || 'An unexpected error occurred')
       throw error
     }
     return null
@@ -336,8 +337,8 @@ export default function DashboardPage() {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Failed to delete chat')
       }
-    } catch (error) {
-      console.error('Error deleting chat:', error)
+    } catch (error: any) {
+      toast.error('Failed to delete chat', error?.message || 'An unexpected error occurred')
       throw error
     }
   }
@@ -370,10 +371,105 @@ export default function DashboardPage() {
         }),
       })
       if (!response.ok) {
-        console.error('Failed to save assistant message')
+        toast.warning('Failed to save assistant message')
       }
-    } catch (error) {
-      console.error('Error saving assistant message:', error)
+    } catch (error: any) {
+      toast.warning('Failed to save assistant message', error?.message || 'An unexpected error occurred')
+    }
+  }
+
+  // Instant chat creation from heading click - no metadata, no API calls
+  // Just creates a chat with the title and opens it immediately
+  const handleCreateChatFromHeading = async (title: string): Promise<string | null> => {
+    // Get projectId for chat creation
+    let projectId = selectedProject
+    if (!projectId) {
+      if (projects.length > 0) {
+        projectId = projects[0].id
+        setSelectedProject(projectId)
+        await loadChats(projectId)
+      } else {
+        toast.warning('Please create a project first')
+        return null
+      }
+    }
+    
+    if (!projectId || projectId.trim().length === 0) {
+      toast.warning('Project ID is required', 'Please select a project first')
+      return null
+    }
+
+    // Truncate title if too long
+    const chatTitle = title.length > 50 ? title.substring(0, 50) + '...' : title
+
+    try {
+      // Create chat instantly with just the title - no paperData, no metadata
+      const response = await fetch('/api/chats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          projectId, 
+          title: chatTitle,
+          // No paperData, no messages - chat opens empty and ready
+        }),
+      })
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        let errorData
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { error: errorText || 'Unknown error' }
+        }
+        toast.error('Failed to create chat', errorData.error || 'Unknown error')
+        return null
+      }
+
+      const data = await response.json()
+      const newChatId = data.chat?.id || data.chat?._id
+      
+      if (!newChatId) {
+        toast.error('Failed to create chat', 'No chat ID returned from server')
+        return null
+      }
+
+      // Optimistically add the new chat to state immediately for instant sidebar update
+      const newChat: Chat = {
+        id: newChatId,
+        title: chatTitle,
+        projectId: projectId,
+        messages: [],
+        depth: 100,
+        isFavorite: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      
+      // Add to chats state immediately (optimistic update)
+      setChats(prevChats => {
+        // Check if chat already exists to avoid duplicates
+        if (prevChats.some(chat => chat.id === newChatId)) {
+          return prevChats
+        }
+        // Add new chat at the beginning (most recent)
+        return [newChat, ...prevChats]
+      })
+
+      // Switch to new chat immediately
+      setSelectedChat(newChatId)
+
+      // Refresh chats list from server in background to ensure consistency
+      loadChats().catch(error => {
+        toast.warning('Failed to refresh chat list', 'The chat was created but may not appear in the sidebar')
+        // If refresh fails, the optimistic update is still there
+      })
+
+      toast.success('Chat created successfully')
+      return newChatId
+    } catch (error: any) {
+      toast.error('Failed to create chat', error?.message || 'Unknown error')
+      return null
     }
   }
 
@@ -457,23 +553,42 @@ export default function DashboardPage() {
         } catch {
           errorData = { error: errorText || 'Unknown error' }
         }
-        console.error('Create chat error response:', errorData)
-        alert(`Failed to create chat: ${errorData.error || 'Unknown error'}`)
+        toast.error('Failed to create chat', errorData.error || 'Unknown error')
         return null
       }
 
       const data = await response.json()
-      console.log('Chat creation response:', data)
       
       const newChatId = data.chat?.id || data.chat?._id
       
       if (!newChatId) {
-        console.error('No chat ID returned from creation. Response:', data)
-        alert('Failed to create chat: No chat ID returned')
+        toast.error('Failed to create chat', 'No chat ID returned from server')
         return null
       }
 
       console.log('Chat created successfully with ID:', newChatId)
+
+      // Optimistically add the new chat to state immediately for instant sidebar update
+      const newChat: Chat = {
+        id: newChatId,
+        title: title,
+        projectId: projectId,
+        messages: [rootMessage],
+        depth: 100,
+        isFavorite: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }
+      
+      // Add to chats state immediately (optimistic update)
+      setChats(prevChats => {
+        // Check if chat already exists to avoid duplicates
+        if (prevChats.some(chat => chat.id === newChatId)) {
+          return prevChats
+        }
+        // Add new chat at the beginning (most recent)
+        return [newChat, ...prevChats]
+      })
 
       // Update chatMetadata with additional node context data
       try {
@@ -487,24 +602,14 @@ export default function DashboardPage() {
         
         if (!updateResponse.ok) {
           const errorText = await updateResponse.text()
-          console.warn('Failed to update chatMetadata:', errorText)
-        } else {
-          console.log('Chat metadata updated successfully')
+          toast.warning('Failed to update chat metadata', errorText)
         }
-      } catch (error) {
-        console.warn('Error updating chatMetadata:', error)
+      } catch (error: any) {
+        toast.warning('Failed to update chat metadata', error?.message || 'Metadata update failed')
         // Continue even if metadata update fails
       }
 
-      // Rule 6 & 7: Auto-switch to the new chat and refresh sidebar
-      console.log('Refreshing chats list...')
-      await loadChats()
-      console.log('Chats list refreshed')
-      
-      // Wait a moment for chats state to update
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      // Now switch to the new chat - the useEffect will handle loading messages
+      // Switch to new chat immediately
       console.log('Switching to new chat:', newChatId)
       setSelectedChat(newChatId)
       
@@ -512,13 +617,16 @@ export default function DashboardPage() {
       // But we also set it here to ensure it's set immediately
       setCurrentChatHasPaperData(true)
       
-      console.log('State updated. useEffect should handle loading messages.')
-      console.log('Successfully created and switched to new chat:', newChatId)
-
+      // Refresh chats list from server in background to ensure consistency
+      loadChats().catch(error => {
+        toast.warning('Failed to refresh chat list', 'The chat was created but may not appear in the sidebar')
+        // If refresh fails, the optimistic update is still there
+      })
+      
+      toast.success('Chat created successfully')
       return newChatId
     } catch (error: any) {
-      console.error('Error creating chat from node:', error)
-      alert(`Error creating chat: ${error.message || 'Unknown error'}`)
+      toast.error('Failed to create chat', error?.message || 'Unknown error')
       return null
     }
   }
@@ -577,10 +685,10 @@ export default function DashboardPage() {
             })
             
             if (!saveResponse.ok) {
-              console.error('Failed to save citation network')
+              toast.warning('Failed to save citation network')
             }
-          } catch (error) {
-            console.error('Error saving network data:', error)
+          } catch (error: any) {
+            toast.warning('Failed to save network data', error?.message || 'An unexpected error occurred')
           }
         }
 
@@ -666,9 +774,8 @@ export default function DashboardPage() {
                     // Trigger storage update event
                     window.dispatchEvent(new CustomEvent('chat-messages-updated', { detail: { chatId: selectedChat } }))
                   }
-                } catch (corpusError) {
-                  console.error('Error fetching corpus:', corpusError)
-                  // Don't show error to user, just log it
+                } catch (corpusError: any) {
+                  toast.warning('Failed to fetch paper details', 'Some information may be incomplete')
                 }
               }
               
@@ -694,7 +801,7 @@ export default function DashboardPage() {
               return // Exit early, don't show placeholder
             }
           } catch (error: any) {
-            console.error('Error searching papers:', error)
+            toast.error('Failed to search papers', error?.message || 'Unknown error')
             // Show error message instead of placeholder
             const errorMessage = {
               role: 'assistant' as const,
@@ -736,8 +843,8 @@ export default function DashboardPage() {
           })
         }, 1000)
       }
-    } catch (error) {
-      console.error('Error sending message:', error)
+    } catch (error: any) {
+      toast.error('Failed to send message', error?.message || 'An unexpected error occurred')
     }
   }
 
@@ -847,8 +954,8 @@ export default function DashboardPage() {
                 )
               )
             }
-          } catch (error) {
-            console.error('Error toggling favorite:', error)
+          } catch (error: any) {
+            toast.warning('Failed to toggle favorite', error?.message || 'An unexpected error occurred')
           }
         }}
         onDeleteProject={handleDeleteProject}
@@ -879,6 +986,7 @@ export default function DashboardPage() {
                     projectId={selectedProject!}
                     chatDepth={currentChatDepth}
                     onCreateChatFromNode={handleCreateChatFromNode}
+                    onCreateChatFromHeading={handleCreateChatFromHeading}
                   />
                 ) : (
                   <ChatInterface
@@ -898,8 +1006,8 @@ export default function DashboardPage() {
                         if (response.ok) {
                           setCurrentChatDepth(newDepth)
                         }
-                      } catch (error) {
-                        console.error('Error updating chat depth:', error)
+                      } catch (error: any) {
+                        toast.warning('Failed to update chat depth', error?.message || 'An unexpected error occurred')
                       }
                     }}
                     onCitationNetwork={async (response) => {
@@ -912,8 +1020,8 @@ export default function DashboardPage() {
                             messages: currentMessages,
                           }),
                         })
-                      } catch (error) {
-                        console.error('Error storing citation network:', error)
+                      } catch (error: any) {
+                        toast.warning('Failed to store citation network', error?.message || 'An unexpected error occurred')
                       }
                     }}
                     onCreateChatFromNode={handleCreateChatFromNode}
@@ -936,8 +1044,8 @@ export default function DashboardPage() {
                         )
                         setCurrentChatHasPaperData(hasPaperData || hasPapersInMessages)
                       }
-                    } catch (error) {
-                      console.error('Error checking chat for paperData:', error)
+                    } catch (error: any) {
+                      toast.warning('Failed to check chat data', error?.message || 'An unexpected error occurred')
                     }
                   }}
                   projectId={selectedProject}

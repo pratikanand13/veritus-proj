@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { VeritusPaper } from '@/types/veritus'
 import { useChatPaperStorage } from '@/lib/hooks/use-chat-paper-storage'
+import { toast } from '@/lib/utils/toast'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -135,7 +136,8 @@ export function KeywordSelectionPanel({
     fetchRootPaper()
   }, [open, chatId, messages])
 
-  // Extract suggested keywords, authors, references, TLDRs, and years from root paper AND initial suggestions
+  // Extract suggested keywords, authors, references, TLDRs, and years from current + parent nodes (initialSuggestions)
+  // Priority: initialSuggestions (current + parent nodes) > rootPaper (fallback only)
   const { suggestedKeywords, suggestedAuthors, suggestedReferences, suggestedTLDRs, suggestedYears, suggestedJournals } = useMemo(() => {
     const keywords: string[] = []
     const authors: string[] = []
@@ -144,7 +146,8 @@ export function KeywordSelectionPanel({
     const years: number[] = []
     const journals: string[] = []
 
-    // Add initial suggestions from current node and parent nodes (from chatstore)
+    // PRIMARY SOURCE: initialSuggestions from current node and parent nodes (from chatstore)
+    // This is the main source - it contains data from current + parent nodes
     if (initialSuggestions) {
       if (initialSuggestions.keywords) {
         initialSuggestions.keywords.forEach(kw => {
@@ -168,8 +171,11 @@ export function KeywordSelectionPanel({
       }
     }
 
-    // Also extract from root paper (chat store entry) for backward compatibility
-    if (rootPaper) {
+    // FALLBACK ONLY: Extract from root paper ONLY if initialSuggestions is empty/missing
+    // This ensures we prioritize current + parent node data over root paper
+    if (rootPaper && (!initialSuggestions || 
+        (!initialSuggestions.keywords?.length && !initialSuggestions.authors?.length && 
+         !initialSuggestions.references?.length && !initialSuggestions.tldrs?.length))) {
       // Extract from fieldsOfStudy
       if (rootPaper.fieldsOfStudy && Array.isArray(rootPaper.fieldsOfStudy)) {
         rootPaper.fieldsOfStudy.forEach((field: string) => {
@@ -251,6 +257,11 @@ export function KeywordSelectionPanel({
     if (selectedKeywords.includes(keyword)) {
       setSelectedKeywords(selectedKeywords.filter(k => k !== keyword))
     } else {
+      // Maximum 2 keywords allowed
+      if (selectedKeywords.length >= 2) {
+        toast.warning('Keyword limit reached', 'Please select only two keywords before continuing.')
+        return
+      }
       setSelectedKeywords([...selectedKeywords, keyword])
     }
   }
@@ -281,6 +292,12 @@ export function KeywordSelectionPanel({
 
   const handleAddCustomKeyword = () => {
     if (customKeyword.trim() && !selectedKeywords.includes(customKeyword.trim())) {
+      // Maximum 2 keywords allowed
+      if (selectedKeywords.length >= 2) {
+        toast.warning('Keyword limit reached', 'Please select only two keywords before continuing.')
+        setCustomKeyword('')
+        return
+      }
       setSelectedKeywords([...selectedKeywords, customKeyword.trim()])
       setCustomKeyword('')
     }
@@ -312,13 +329,19 @@ export function KeywordSelectionPanel({
 
   const handleSearch = () => {
     if (!jobType) {
-      alert('Please select at least keywords (3-10) or TLDRs (50-5000 characters)')
+      toast.warning('Invalid selection', 'Please select at least keywords (max 2) or TLDRs (50-5000 characters)')
       return
     }
 
-    // Validate keywordSearch: need 3-10 keywords
-    if (jobType === 'keywordSearch' && (selectedKeywords.length < 3 || selectedKeywords.length > 10)) {
-      alert(`keywordSearch requires 3-10 keywords. You have selected ${selectedKeywords.length}.`)
+    // Validate keyword limit: maximum 2 keywords allowed
+    if (selectedKeywords.length > 2) {
+      toast.warning('Too many keywords', 'Please select only two keywords before continuing.')
+      return
+    }
+
+    // Validate keywordSearch: need 1-2 keywords
+    if (jobType === 'keywordSearch' && selectedKeywords.length === 0) {
+      toast.warning('No keywords selected', 'Please select at least one keyword for keywordSearch')
       return
     }
 
@@ -326,24 +349,28 @@ export function KeywordSelectionPanel({
     if (jobType === 'querySearch' && selectedTLDRs.length > 0) {
       const queryLength = selectedTLDRs.join(' ').length
       if (queryLength < 50 || queryLength > 5000) {
-        alert(`querySearch requires 50-5000 characters in query. Your query has ${queryLength} characters.`)
+        toast.warning('Invalid query length', `querySearch requires 50-5000 characters in query. Your query has ${queryLength} characters.`)
         return
       }
     }
 
     // Validate combinedSearch: need both valid keywords and query
     if (jobType === 'combinedSearch') {
-      if (selectedKeywords.length < 3 || selectedKeywords.length > 10) {
-        alert(`combinedSearch requires 3-10 keywords. You have selected ${selectedKeywords.length}.`)
+      if (selectedKeywords.length === 0) {
+        toast.warning('No keywords selected', 'Please select at least one keyword for combinedSearch')
+        return
+      }
+      if (selectedKeywords.length > 2) {
+        toast.warning('Too many keywords', 'Please select only two keywords before continuing.')
         return
       }
       if (selectedTLDRs.length === 0) {
-        alert('combinedSearch requires at least one TLDR to create a query string.')
+        toast.warning('Missing TLDR', 'combinedSearch requires at least one TLDR to create a query string.')
         return
       }
       const queryLength = selectedTLDRs.join(' ').length
       if (queryLength < 50 || queryLength > 5000) {
-        alert(`combinedSearch requires 50-5000 characters in query. Your query has ${queryLength} characters.`)
+        toast.warning('Invalid query length', `combinedSearch requires 50-5000 characters in query. Your query has ${queryLength} characters.`)
         return
       }
     }
@@ -421,11 +448,11 @@ export function KeywordSelectionPanel({
               <p className="text-xs text-gray-400">
                 {jobType === 'combinedSearch' && 'Search using both phrases (keywords) and query string (TLDR)'}
                 {jobType === 'querySearch' && 'Search using a query string (TLDR) - requires 50-5000 characters'}
-                {jobType === 'keywordSearch' && 'Search using phrases (keywords) - requires 3-10 phrases'}
+                {jobType === 'keywordSearch' && 'Search using phrases (keywords) - maximum 2 keywords allowed'}
               </p>
               {jobType === 'keywordSearch' && selectedKeywords.length > 0 && (
-                <p className={`text-xs mt-1 ${selectedKeywords.length >= 3 && selectedKeywords.length <= 10 ? 'text-green-400' : 'text-yellow-400'}`}>
-                  Keywords selected: {selectedKeywords.length} {selectedKeywords.length < 3 ? '(need at least 3)' : selectedKeywords.length > 10 ? '(max 10)' : '(valid)'}
+                <p className={`text-xs mt-1 ${selectedKeywords.length <= 2 ? 'text-green-400' : 'text-yellow-400'}`}>
+                  Keywords selected: {selectedKeywords.length} {selectedKeywords.length > 2 ? '(max 2)' : '(valid)'}
                 </p>
               )}
               {jobType === 'querySearch' && selectedTLDRs.length > 0 && (
@@ -436,8 +463,8 @@ export function KeywordSelectionPanel({
               {jobType === 'combinedSearch' && (
                 <>
                   {selectedKeywords.length > 0 && (
-                    <p className={`text-xs mt-1 ${selectedKeywords.length >= 3 && selectedKeywords.length <= 10 ? 'text-green-400' : 'text-yellow-400'}`}>
-                      Keywords: {selectedKeywords.length} {selectedKeywords.length < 3 ? '(need at least 3)' : selectedKeywords.length > 10 ? '(max 10)' : '(valid)'}
+                    <p className={`text-xs mt-1 ${selectedKeywords.length <= 2 ? 'text-green-400' : 'text-yellow-400'}`}>
+                      Keywords: {selectedKeywords.length} {selectedKeywords.length > 2 ? '(max 2)' : '(valid)'}
                     </p>
                   )}
                   {selectedTLDRs.length > 0 && (
@@ -459,12 +486,16 @@ export function KeywordSelectionPanel({
               </Label>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-400">
-                  {rootPaper ? 'From chat store' : isLoadingRootPaper ? 'Loading...' : 'No root paper'}
+                  {initialSuggestions && (initialSuggestions.keywords?.length || initialSuggestions.authors?.length || initialSuggestions.references?.length || initialSuggestions.tldrs?.length) 
+                    ? 'From chat store (current + parent nodes)' 
+                    : isLoadingRootPaper 
+                      ? 'Loading...' 
+                      : 'No suggestions available'}
                 </span>
               </div>
             </div>
             <p className="text-sm text-gray-400 mb-3">
-              Select keywords from the root paper in chat store or add custom ones
+              Select keywords from current and parent nodes in chat store or add custom ones (maximum 2 keywords)
             </p>
             
             {/* Selected Keywords */}
@@ -487,7 +518,7 @@ export function KeywordSelectionPanel({
             {/* Suggested Keywords */}
             {suggestedKeywords.length > 0 && (
               <div className="mb-3">
-                <p className="text-xs text-gray-500 mb-2">Suggested from chat store (root paper):</p>
+                <p className="text-xs text-gray-500 mb-2">Suggested from chat store (current + parent nodes):</p>
                 <div className="flex flex-wrap gap-2">
                   {suggestedKeywords.map((keyword) => (
                     <Badge
@@ -510,7 +541,7 @@ export function KeywordSelectionPanel({
             {/* Add Custom Keyword */}
             <div className="flex gap-2">
               <Input
-                placeholder="Type keyword and press Enter..."
+                placeholder={selectedKeywords.length >= 2 ? "Maximum 2 keywords reached" : "Type keyword and press Enter (max 2)"}
                 value={customKeyword}
                 onChange={(e) => setCustomKeyword(e.target.value)}
                 onKeyDown={(e) => {
@@ -519,11 +550,12 @@ export function KeywordSelectionPanel({
                     handleAddCustomKeyword()
                   }
                 }}
-                className="bg-[#171717] border-[#2a2a2a] text-white placeholder:text-gray-500"
+                disabled={selectedKeywords.length >= 2}
+                className="bg-[#171717] border-[#2a2a2a] text-white placeholder:text-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
               />
               <Button
+                disabled={selectedKeywords.length >= 2 || !customKeyword.trim()}
                 onClick={handleAddCustomKeyword}
-                disabled={!customKeyword.trim()}
                 className="bg-[#22c55e] hover:bg-[#16a34a] text-black"
               >
                 <Plus className="h-4 w-4" />
@@ -538,7 +570,7 @@ export function KeywordSelectionPanel({
               TLDR
             </Label>
             <p className="text-sm text-gray-400 mb-3">
-              Select TLDR summary from the root paper in chat store
+              Select TLDR summary from current and parent nodes in chat store
             </p>
             
             {/* Selected TLDRs */}
@@ -561,7 +593,7 @@ export function KeywordSelectionPanel({
             {/* Suggested TLDRs */}
             {suggestedTLDRs.length > 0 && (
               <div>
-                <p className="text-xs text-gray-500 mb-2">Suggested from chat store (root paper):</p>
+                <p className="text-xs text-gray-500 mb-2">Suggested from chat store (current + parent nodes):</p>
                 <div className="flex flex-col gap-2 max-h-40 overflow-y-auto">
                   {suggestedTLDRs.map((tldr) => (
                     <Badge
@@ -589,7 +621,7 @@ export function KeywordSelectionPanel({
               Authors
             </Label>
             <p className="text-sm text-gray-400 mb-3">
-              Select authors from the root paper in chat store
+              Select authors from current and parent nodes in chat store
             </p>
             
             {/* Selected Authors */}
@@ -612,7 +644,7 @@ export function KeywordSelectionPanel({
             {/* Suggested Authors */}
             {suggestedAuthors.length > 0 && (
               <div>
-                <p className="text-xs text-gray-500 mb-2">Suggested from chat store (root paper):</p>
+                <p className="text-xs text-gray-500 mb-2">Suggested from chat store (current + parent nodes):</p>
                 <div className="flex flex-wrap gap-2">
                   {suggestedAuthors.map((author) => (
                     <Badge
@@ -640,7 +672,7 @@ export function KeywordSelectionPanel({
               References
             </Label>
             <p className="text-sm text-gray-400 mb-3">
-              Select paper title from the root paper in chat store
+              Select paper title from current and parent nodes in chat store
             </p>
             
             {/* Selected References */}
@@ -663,7 +695,7 @@ export function KeywordSelectionPanel({
             {/* Suggested References */}
             {suggestedReferences.length > 0 && (
               <div>
-                <p className="text-xs text-gray-500 mb-2">Suggested from chat store (root paper):</p>
+                <p className="text-xs text-gray-500 mb-2">Suggested from chat store (current + parent nodes):</p>
                 <div className="flex flex-wrap gap-2">
                   {suggestedReferences.map((ref) => (
                     <Badge

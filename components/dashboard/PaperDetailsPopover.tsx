@@ -26,6 +26,7 @@ interface PaperDetailsPopoverProps {
   paper: VeritusPaper | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCreateChatFromHeading?: (title: string) => Promise<string | null>
 }
 
 const formatDate = (value?: string | null) => {
@@ -109,7 +110,7 @@ const AccessCard = ({
   )
 }
 
-export function PaperDetailsPopover({ paper, open, onOpenChange }: PaperDetailsPopoverProps) {
+export function PaperDetailsPopover({ paper, open, onOpenChange, onCreateChatFromHeading }: PaperDetailsPopoverProps) {
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [isBookmarking, setIsBookmarking] = useState(false)
   const [bookmarks, setBookmarks] = useState<any[]>([])
@@ -214,7 +215,17 @@ export function PaperDetailsPopover({ paper, open, onOpenChange }: PaperDetailsP
           <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-6 shadow-sm">
             <p className="text-sm font-semibold uppercase tracking-[0.1em] text-slate-300">Title</p>
             <div className="flex flex-col gap-2">
-              <h1 className="text-3xl font-semibold leading-tight text-white">{paper.title}</h1>
+              <h1 
+                className="text-3xl font-semibold leading-tight text-white cursor-pointer hover:text-[#22c55e] transition-colors"
+                onClick={() => {
+                  if (onCreateChatFromHeading && paper.title) {
+                    onCreateChatFromHeading(paper.title)
+                  }
+                }}
+                title="Click to create a new chat with this paper title"
+              >
+                {paper.title}
+              </h1>
               <p className="text-base text-slate-200">{formatValue(paper.authors)}</p>
               <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
                 <span>{formatValue(paper.year)}</span>
