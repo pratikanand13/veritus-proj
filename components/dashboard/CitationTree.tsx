@@ -47,7 +47,7 @@ interface CitationTreeProps {
     selectedFields?: Map<string, string>,
     nodeContext?: NodeTransferPayload
   ) => Promise<string | null>
-  onCreateChatFromHeading?: (title: string) => Promise<string | null>
+  onCreateChatFromHeading?: (titleOrPaper: string | VeritusPaper) => Promise<string | null>
 }
 
 export function CitationTree({ citationNetworkResponse, chatId, messages, onNodeClick, onExpandNode, onCreateChatFromNode, onCreateChatFromHeading }: CitationTreeProps) {

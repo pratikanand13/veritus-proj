@@ -4,6 +4,9 @@ import User from '@/models/User'
 import { loginSchema } from '@/lib/validators'
 import { generateToken } from '@/lib/auth'
 
+// Force dynamic rendering since this route uses cookies for authentication
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: Request) {
   try {
     await connectDB()

@@ -541,7 +541,7 @@ export function KeywordSelectionPanel({
             {/* Add Custom Keyword */}
             <div className="flex gap-2">
               <Input
-                placeholder={selectedKeywords.length >= 2 ? "Maximum 2 keywords reached" : "Type keyword and press Enter (max 2)"}
+                placeholder={selectedKeywords.length >= 2 ? "Maximum 2 keywords reached" : "Type keyword and press Enter (enter any two)"}
                 value={customKeyword}
                 onChange={(e) => setCustomKeyword(e.target.value)}
                 onKeyDown={(e) => {

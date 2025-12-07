@@ -21,7 +21,7 @@ const Dialog = ({ open, onOpenChange, children }: DialogProps) => {
       className="fixed inset-0 z-50 flex items-center justify-center"
       onClick={() => onOpenChange(false)}
     >
-      <div className="fixed inset-0 bg-black/80 transition-opacity" />
+      <div className="fixed inset-0 bg-black/80 backdrop-blur-md transition-opacity" />
       <div onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
@@ -30,10 +30,16 @@ const Dialog = ({ open, onOpenChange, children }: DialogProps) => {
 }
 
 const DialogContent = ({ children, className }: DialogContentProps) => {
+  // Check if this is a large modal (full screen style)
+  const isLargeModal = className?.includes('max-w-[95vw]') || className?.includes('w-[95vw]')
+  
   return (
     <div
       className={cn(
-        "rounded-md bg-card border border-border fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-3.5 p-5 shadow-lg sm:rounded-xl",
+        "rounded-md bg-card border border-border fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] shadow-lg sm:rounded-xl",
+        isLargeModal 
+          ? "w-[95vw] h-[95vh] max-w-[95vw] max-h-[95vh] flex flex-col" 
+          : "grid w-full max-w-lg gap-3.5 p-5",
         className
       )}
     >

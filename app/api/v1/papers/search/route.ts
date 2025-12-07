@@ -9,6 +9,9 @@ import connectDB from '@/lib/db'
 import Chat from '@/models/Chat'
 import mongoose from 'mongoose'
 
+// Force dynamic rendering since this route uses cookies for authentication
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/v1/papers/search
  * Search papers by title using Veritus API

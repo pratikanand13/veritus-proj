@@ -10,7 +10,7 @@ import { toast } from '@/lib/utils/toast'
 
 interface PaperAccordionProps {
   papers: VeritusPaper[]
-  onCreateChatFromHeading?: (title: string) => Promise<string | null>
+  onCreateChatFromHeading?: (titleOrPaper: string | VeritusPaper) => Promise<string | null>
 }
 
 export function PaperAccordion({ papers, onCreateChatFromHeading }: PaperAccordionProps) {
@@ -122,10 +122,11 @@ export function PaperAccordion({ papers, onCreateChatFromHeading }: PaperAccordi
                   onClick={(e) => {
                     e.stopPropagation()
                     if (onCreateChatFromHeading && paper.title) {
-                      onCreateChatFromHeading(paper.title)
+                      // Pass the full paper object so chat can be created with paperData
+                      onCreateChatFromHeading(paper)
                     }
                   }}
-                  title="Click to create a new chat with this paper title"
+                  title="Click to create a new chat with this paper"
                 >
                   {paper.title}
                 </h3>

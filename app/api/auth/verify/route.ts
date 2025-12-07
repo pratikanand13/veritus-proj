@@ -3,6 +3,9 @@ import { getCurrentUser } from '@/lib/auth'
 import connectDB from '@/lib/db'
 import User from '@/models/User'
 
+// Force dynamic rendering since this route uses cookies for authentication
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
   try {
     const payload = await getCurrentUser()

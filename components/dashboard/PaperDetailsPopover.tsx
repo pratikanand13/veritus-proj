@@ -26,7 +26,7 @@ interface PaperDetailsPopoverProps {
   paper: VeritusPaper | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreateChatFromHeading?: (title: string) => Promise<string | null>
+  onCreateChatFromHeading?: (titleOrPaper: string | VeritusPaper) => Promise<string | null>
 }
 
 const formatDate = (value?: string | null) => {
@@ -218,8 +218,9 @@ export function PaperDetailsPopover({ paper, open, onOpenChange, onCreateChatFro
               <h1 
                 className="text-3xl font-semibold leading-tight text-white cursor-pointer hover:text-[#22c55e] transition-colors"
                 onClick={() => {
-                  if (onCreateChatFromHeading && paper.title) {
-                    onCreateChatFromHeading(paper.title)
+                  if (onCreateChatFromHeading && paper) {
+                    // Pass the full paper object so chat can be created with paperData
+                    onCreateChatFromHeading(paper)
                   }
                 }}
                 title="Click to create a new chat with this paper title"

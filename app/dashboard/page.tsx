@@ -11,6 +11,7 @@ import { PaperSearchPage } from '@/components/dashboard/PaperSearchPage'
 import { PaperChatView } from '@/components/dashboard/PaperChatView'
 import { shouldUseMockData } from '@/lib/config/mock-config'
 import { toast } from '@/lib/utils/toast'
+import { VeritusPaper } from '@/types/veritus'
 
 interface User {
   id: string
@@ -380,7 +381,7 @@ export default function DashboardPage() {
 
   // Instant chat creation from heading click - no metadata, no API calls
   // Just creates a chat with the title and opens it immediately
-  const handleCreateChatFromHeading = async (title: string): Promise<string | null> => {
+  const handleCreateChatFromHeading = async (titleOrPaper: string | VeritusPaper): Promise<string | null> => {
     // Get projectId for chat creation
     let projectId = selectedProject
     if (!projectId) {
@@ -393,25 +394,51 @@ export default function DashboardPage() {
         return null
       }
     }
-    
+
     if (!projectId || projectId.trim().length === 0) {
       toast.warning('Project ID is required', 'Please select a project first')
       return null
     }
 
+    // Determine if we received a paper object or just a title string
+    const isPaperObject = typeof titleOrPaper === 'object' && titleOrPaper !== null && 'title' in titleOrPaper
+    const paper = isPaperObject ? titleOrPaper as VeritusPaper : null
+    const title = isPaperObject ? (titleOrPaper as VeritusPaper).title : titleOrPaper as string
+
     // Truncate title if too long
     const chatTitle = title.length > 50 ? title.substring(0, 50) + '...' : title
 
     try {
-      // Create chat instantly with just the title - no paperData, no metadata
+      // If we have paper data, create chat with paperData and initial message
+      // Otherwise, create empty chat (for backward compatibility)
+      const requestBody: any = {
+        projectId,
+        title: chatTitle,
+      }
+
+      if (paper) {
+        // Create chat with paperData in chatMetadata and initial message
+        const cleanPaperData = {
+          ...paper,
+        }
+
+        const rootMessage: any = {
+          role: 'assistant' as const,
+          content: `Paper: ${title}\n\nAuthors: ${paper.authors || 'N/A'}\nYear: ${paper.year || 'N/A'}\nJournal: ${paper.journalName || 'N/A'}\n\n${paper.abstract ? `Abstract: ${paper.abstract}` : ''}\n\n${paper.tldr ? `TLDR: ${paper.tldr}` : ''}`,
+          timestamp: new Date(),
+          papers: [cleanPaperData],
+        }
+
+        requestBody.messages = [rootMessage]
+        requestBody.chatMetadata = {
+          paperData: cleanPaperData,
+        }
+      }
+
       const response = await fetch('/api/chats', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          projectId, 
-          title: chatTitle,
-          // No paperData, no messages - chat opens empty and ready
-        }),
+        body: JSON.stringify(requestBody),
       })
       
       if (!response.ok) {

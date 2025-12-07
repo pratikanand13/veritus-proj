@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, ReactNode } from 'react'
-import { ExternalLink, FileText, GitBranch, Network, Search, Loader2, ShieldCheck, Sparkles, Bookmark, BookmarkCheck } from 'lucide-react'
+import { ExternalLink, FileText, GitBranch, Network, Search, Loader2, ShieldCheck, Sparkles, Bookmark, BookmarkCheck, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { KeywordSelectionPanel } from './KeywordSelectionPanel'
 import { PaperAccordion } from './PaperAccordion'
 import { CitationTree } from './CitationTree'
@@ -23,7 +24,7 @@ interface PaperChatViewProps {
     selectedFields?: Map<string, string>,
     nodeContext?: NodeTransferPayload
   ) => Promise<string | null>
-  onCreateChatFromHeading?: (title: string) => Promise<string | null>
+  onCreateChatFromHeading?: (titleOrPaper: string | VeritusPaper) => Promise<string | null>
 }
 
 const formatDate = (value?: string | null) => {
@@ -120,6 +121,7 @@ export function PaperChatView({
   const [loadingSearch, setLoadingSearch] = useState(false)
   const [loadingCitationNetwork, setLoadingCitationNetwork] = useState(false)
   const [showKeywordSelectionPanel, setShowKeywordSelectionPanel] = useState(false)
+  const [showCitationNetworkModal, setShowCitationNetworkModal] = useState(false)
   const [citationNetworkResponse, setCitationNetworkResponse] = useState<CitationNetworkResponse | null>(null)
   const [messages, setMessages] = useState<any[]>([])
   const [isBookmarked, setIsBookmarked] = useState(false)
@@ -576,6 +578,8 @@ export function PaperChatView({
 
       const data: CitationNetworkResponse = await response.json()
       setCitationNetworkResponse(data)
+      // Open the modal after generating the citation network
+      setShowCitationNetworkModal(true)
     } catch (error: any) {
       // Extract error message properly to avoid "[object Object]"
       let errorMessage = 'Failed to generate citation network'
@@ -665,8 +669,9 @@ export function PaperChatView({
               <h1 
                 className="text-3xl font-semibold leading-tight text-white cursor-pointer hover:text-[#22c55e] transition-colors"
                 onClick={() => {
-                  if (onCreateChatFromHeading && paperData?.title) {
-                    onCreateChatFromHeading(paperData.title)
+                  if (onCreateChatFromHeading && paperData) {
+                    // Pass the full paperData object so chat can be created with paperData
+                    onCreateChatFromHeading(paperData)
                   }
                 }}
                 title="Click to create a new chat with this paper title"
@@ -873,9 +878,32 @@ export function PaperChatView({
           {/* Search Results */}
           {hasSearchResults && !loadingSearch && (
             <div>
-              <h2 className="text-xl font-semibold text-foreground mb-4">
-                Found {searchResults.length} similar papers
-              </h2>
+              {/* Header with title and Generate Citation Network button */}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-foreground">
+                  Found {searchResults.length} similar papers
+                </h2>
+                {/* Generate Citation Network Button - Only show after search is completed */}
+                {searchResults.length > 0 && (
+                  <Button
+                    onClick={handleGenerateCitationNetwork}
+                    disabled={loadingCitationNetwork}
+                    className="bg-[#22c55e] hover:bg-[#16a34a] text-black px-4 py-2"
+                  >
+                    {loadingCitationNetwork ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Network className="mr-2 h-4 w-4" />
+                        Generate Citation Network
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
               <PaperAccordion 
                 papers={searchResults} 
                 onCreateChatFromHeading={onCreateChatFromHeading}
@@ -883,44 +911,38 @@ export function PaperChatView({
             </div>
           )}
 
-          {/* Citation Graph Button - Only show after user has searched */}
-          {hasSearchResults && searchResults.length > 0 && (
-            <div className="flex justify-center pt-4">
-              <Button
-                onClick={handleGenerateCitationNetwork}
-                disabled={loadingCitationNetwork || !hasSearchResults}
-                className="bg-[#22c55e] hover:bg-[#16a34a] text-black px-4 py-2"
-              >
-                {loadingCitationNetwork ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Network className="mr-2 h-4 w-4" />
-                    Generate Citation Network
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
-
-          {/* Citation Network Display - Only show after user clicks "Generate Citation Network" */}
-          {citationNetworkResponse && hasSearchResults && (
-            <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-sm">
-              <h2 className="text-xl font-semibold text-foreground mb-4">Citation Network</h2>
-              <div className="pt-2">
-                <CitationTree
-                  onCreateChatFromHeading={onCreateChatFromHeading}
-                  citationNetworkResponse={citationNetworkResponse}
-                  chatId={chatId}
-                  messages={messages}
-                  onCreateChatFromNode={onCreateChatFromNode}
-                  onExpandNode={async () => null}
-                />
-              </div>
-            </div>
+          {/* Citation Network Modal - Only show after user clicks "Generate Citation Network" */}
+          {citationNetworkResponse && (
+            <Dialog open={showCitationNetworkModal} onOpenChange={setShowCitationNetworkModal}>
+              <DialogContent className="bg-[#0f0f0f] border-[#2a2a2a] text-white max-w-[95vw] max-h-[95vh] w-[95vw] h-[95vh] overflow-hidden p-0 flex flex-col">
+                <DialogHeader className="px-6 pt-6 pb-4 border-b border-[#2a2a2a] flex-shrink-0">
+                  <div className="flex items-center justify-between">
+                    <DialogTitle className="text-white text-2xl flex items-center gap-2">
+                      <Network className="h-6 w-6 text-green-500" />
+                      Citation Network
+                    </DialogTitle>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowCitationNetworkModal(false)}
+                      className="text-white hover:bg-[#2a2a2a]"
+                    >
+                      <X className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </DialogHeader>
+                <div className="flex-1 p-6 overflow-y-auto">
+                  <CitationTree
+                    onCreateChatFromHeading={onCreateChatFromHeading}
+                    citationNetworkResponse={citationNetworkResponse}
+                    chatId={chatId}
+                    messages={messages}
+                    onCreateChatFromNode={onCreateChatFromNode}
+                    onExpandNode={async () => null}
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
           )}
         </div>
       </div>
