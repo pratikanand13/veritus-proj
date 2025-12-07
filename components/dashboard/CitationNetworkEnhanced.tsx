@@ -389,13 +389,93 @@ export function CitationNetworkEnhanced({
       } as CitationNetworkNode & d3.SimulationNodeDatum
     })
 
+    // Calculate dynamic collision radius that accounts for node, label, and keywords box
+    const getCollisionRadius = (node: CitationNetworkNode) => {
+      const nodeRadius = getNodeSize(node, sortBy)
+      const label = node.label || 'Unknown'
+      
+      // Estimate label width (10px font size, ~6px per character average)
+      const labelText = label.length > 30 ? label.substring(0, 30) + '...' : label
+      const estimatedLabelWidth = labelText.length * 6
+      const labelOffset = 15 // dx offset from node center
+      const labelPadding = 10 // extra padding around label
+      
+      // Account for keywords box area (typically on the right side, ~200-300px wide)
+      const keywordsBoxPadding = 250 // Reserve space for keywords box on right side
+      
+      // Calculate total width needed (node + label + padding)
+      const totalWidth = nodeRadius + labelOffset + estimatedLabelWidth + labelPadding
+      
+      // Use the larger of: node radius + label width, or minimum spacing
+      // Also consider keywords box area - nodes should avoid right side
+      const baseCollisionRadius = Math.max(
+        totalWidth / 2, // Half of total width for circular collision
+        nodeRadius + 40 // Minimum spacing
+      )
+      
+      return baseCollisionRadius
+    }
+
     switch (layout) {
       case 'force':
+        // Create boundary to keep nodes away from right edge (where keywords box might be)
+        const boundaryPadding = 300 // Reserve space for keywords box
+        const boundaryWidth = width - boundaryPadding
+        
         simulation = d3.forceSimulation<CitationNetworkNode & d3.SimulationNodeDatum>(nodesWithSimulationProps)
-          .force('link', d3.forceLink<CitationNetworkNode & d3.SimulationNodeDatum, CitationNetworkEdge>(displayData.edges).id((d: any) => d.id).distance(100))
-          .force('charge', d3.forceManyBody().strength(-300))
-          .force('center', d3.forceCenter(width / 2, height / 2))
-          .force('collision', d3.forceCollide().radius((d: any) => getNodeSize(d, sortBy) + 5))
+          .alpha(1) // Start with high energy for better initial positioning
+          .alphaDecay(0.022) // Slower decay for more iterations (default is 0.0228)
+          .alphaMin(0.001) // Lower minimum for more thorough settling
+          .velocityDecay(0.4) // More damping for stability
+          .force('link', d3.forceLink<CitationNetworkNode & d3.SimulationNodeDatum, CitationNetworkEdge>(displayData.edges)
+            .id((d: any) => d.id)
+            .distance((d: any) => {
+              // Increase link distance based on collision radius to prevent overlap
+              const sourceRadius = getCollisionRadius(d.source as CitationNetworkNode)
+              const targetRadius = getCollisionRadius(d.target as CitationNetworkNode)
+              return sourceRadius + targetRadius + 80 // Increased minimum distance between node edges
+            })
+            .strength(0.3)) // Weaker link strength to allow more movement
+          .force('charge', d3.forceManyBody().strength((d: any) => {
+            // Stronger repulsion for better spacing
+            const nodeRadius = getCollisionRadius(d as CitationNetworkNode)
+            return -1200 * (1 + nodeRadius / 15) // Increased repulsion, scales with node size
+          }))
+          .force('center', d3.forceCenter((boundaryWidth + boundaryPadding / 2) / 2, height / 2).strength(0.1))
+          .force('collision', d3.forceCollide()
+            .radius((d: any) => getCollisionRadius(d as CitationNetworkNode))
+            .strength(0.8)) // Strong collision detection
+          .force('x', d3.forceX((boundaryWidth + boundaryPadding / 2) / 2).strength(0.03)) // Gentle pull to center, avoiding right edge
+          .force('y', d3.forceY(height / 2).strength(0.03))
+          .force('boundary', (alpha: number) => {
+            // Custom boundary force to keep nodes away from right edge (keywords box area)
+            nodesWithSimulationProps.forEach((node: any) => {
+              const radius = getCollisionRadius(node as CitationNetworkNode)
+              if (node.x !== undefined && node.x !== null) {
+                // Keep nodes away from right edge (keywords box area) - stronger force
+                if (node.x + radius > boundaryWidth) {
+                  const pushBack = (node.x + radius - boundaryWidth) * alpha * 1.2
+                  node.vx = (node.vx || 0) - pushBack
+                }
+                // Keep nodes away from left edge
+                if (node.x - radius < 0) {
+                  const pushBack = (radius - node.x) * alpha * 1.2
+                  node.vx = (node.vx || 0) + pushBack
+                }
+              }
+              if (node.y !== undefined && node.y !== null) {
+                // Keep nodes within vertical bounds
+                if (node.y + radius > height) {
+                  const pushBack = (node.y + radius - height) * alpha * 1.2
+                  node.vy = (node.vy || 0) - pushBack
+                }
+                if (node.y - radius < 0) {
+                  const pushBack = (radius - node.y) * alpha * 1.2
+                  node.vy = (node.vy || 0) + pushBack
+                }
+              }
+            })
+          })
         break
 
       case 'circular':

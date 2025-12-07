@@ -15,8 +15,6 @@ import {
   X,
   User,
   LogOut,
-  Settings,
-  Key,
   ChevronDown,
   ChevronUp,
   Sparkles,
@@ -55,8 +53,6 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { useRouter } from 'next/navigation'
-import { ApiKeySettings } from './ApiKeySettings'
-import { SearchSettings } from './SearchSettings'
 import { BookmarksManagement } from './BookmarksManagement'
 
 interface SidebarProps {
@@ -99,8 +95,6 @@ export function Sidebar({
   const [showProjectModal, setShowProjectModal] = useState(false)
   const [showEditProjectModal, setShowEditProjectModal] = useState(false)
   const [showEditChatModal, setShowEditChatModal] = useState(false)
-  const [showApiKeySettings, setShowApiKeySettings] = useState(false)
-  const [showSearchSettings, setShowSearchSettings] = useState(false)
   const [showBookmarksManagement, setShowBookmarksManagement] = useState(false)
   const [editingProject, setEditingProject] = useState<{ id: string; name: string; description?: string } | null>(null)
   const [editingChat, setEditingChat] = useState<{ id: string; title: string } | null>(null)
@@ -541,18 +535,6 @@ export function Sidebar({
                   </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => {
-                    setShowSearchSettings(true)
-                  }}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Search Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
-                    setShowApiKeySettings(true)
-                  }}>
-                    <Key className="mr-2 h-4 w-4" />
-                    API Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => {
                     setShowBookmarksManagement(true)
                   }}>
                     <Bookmark className="mr-2 h-4 w-4" />
@@ -587,14 +569,6 @@ export function Sidebar({
         onOpenChange={setShowEditChatModal}
         onUpdateChat={onUpdateChat}
         chat={editingChat}
-      />
-      <ApiKeySettings
-        open={showApiKeySettings}
-        onOpenChange={setShowApiKeySettings}
-      />
-      <SearchSettings
-        open={showSearchSettings}
-        onOpenChange={setShowSearchSettings}
       />
       <BookmarksManagement
         open={showBookmarksManagement}

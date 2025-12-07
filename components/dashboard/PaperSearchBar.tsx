@@ -37,7 +37,7 @@ export function PaperSearchBar({ onSearchResults, onError }: PaperSearchBarProps
       onSearchResults(data.paper ? [data.paper] : data.papers || [])
     } catch (error: any) {
       console.error('Search error:', error)
-      onError(error.message || 'Failed to search papers. Please check your API key settings.')
+      onError(error.message || 'Failed to search papers. Please try again.')
     } finally {
       setLoading(false)
     }

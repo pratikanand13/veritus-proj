@@ -30,8 +30,9 @@ const Dialog = ({ open, onOpenChange, children }: DialogProps) => {
 }
 
 const DialogContent = ({ children, className }: DialogContentProps) => {
-  // Check if this is a large modal (full screen style)
+  // Check if this is a large modal (full screen style) or flex layout
   const isLargeModal = className?.includes('max-w-[95vw]') || className?.includes('w-[95vw]')
+  const isFlexLayout = className?.includes('flex flex-col') || className?.includes('flex-col') || className?.includes('flex-1')
   
   return (
     <div
@@ -39,6 +40,8 @@ const DialogContent = ({ children, className }: DialogContentProps) => {
         "rounded-md bg-card border border-border fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] shadow-lg sm:rounded-xl",
         isLargeModal 
           ? "w-[95vw] h-[95vh] max-w-[95vw] max-h-[95vh] flex flex-col" 
+          : isFlexLayout
+          ? "flex flex-col w-full max-w-4xl"
           : "grid w-full max-w-lg gap-3.5 p-5",
         className
       )}

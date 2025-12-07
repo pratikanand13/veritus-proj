@@ -419,8 +419,8 @@ export function KeywordSelectionPanel({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-[#1f1f1f] border-[#2a2a2a] text-white max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="bg-[#1f1f1f] border-[#2a2a2a] text-white max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
           <DialogTitle className="text-white text-2xl flex items-center gap-2">
             <Hash className="h-6 w-6 text-[#22c55e]" />
             Search Similar Papers
@@ -430,7 +430,9 @@ export function KeywordSelectionPanel({
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-6 py-4">
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-6 pb-4">
+          <div className="space-y-6 py-4">
           {/* Corpus ID */}
           <div>
             <Label className="text-white mb-2 block">Corpus ID</Label>
@@ -500,16 +502,16 @@ export function KeywordSelectionPanel({
             
             {/* Selected Keywords */}
             {selectedKeywords.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-3">
+              <div className="flex flex-wrap gap-2 mb-3 overflow-x-hidden">
                 {selectedKeywords.map((keyword) => (
                   <Badge
                     key={keyword}
                     variant="secondary"
-                    className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer"
+                    className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer max-w-full flex items-center gap-1"
                     onClick={() => handleToggleKeyword(keyword)}
                   >
-                    {keyword}
-                    <X className="ml-1 h-3 w-3" />
+                    <span className="truncate flex-1 min-w-0">{keyword}</span>
+                    <X className="h-3 w-3 flex-shrink-0" />
                   </Badge>
                 ))}
               </div>
@@ -519,19 +521,19 @@ export function KeywordSelectionPanel({
             {suggestedKeywords.length > 0 && (
               <div className="mb-3">
                 <p className="text-xs text-gray-500 mb-2">Suggested from chat store (current + parent nodes):</p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 overflow-x-hidden">
                   {suggestedKeywords.map((keyword) => (
                     <Badge
                       key={keyword}
                       variant="outline"
-                      className={`cursor-pointer border-[#2a2a2a] hover:border-[#22c55e] ${
+                      className={`cursor-pointer border-[#2a2a2a] hover:border-[#22c55e] max-w-full ${
                         selectedKeywords.includes(keyword)
                           ? 'bg-[#22c55e] text-black border-[#22c55e]'
                           : 'text-gray-300 hover:text-white'
                       }`}
                       onClick={() => handleToggleKeyword(keyword)}
                     >
-                      {keyword}
+                      <span className="truncate block max-w-[200px]">{keyword}</span>
                     </Badge>
                   ))}
                 </div>
@@ -575,15 +577,15 @@ export function KeywordSelectionPanel({
             
             {/* Selected TLDRs */}
             {selectedTLDRs.length > 0 && (
-              <div className="flex flex-col gap-2 mb-3">
+              <div className="flex flex-col gap-2 mb-3 overflow-x-hidden">
                 {selectedTLDRs.map((tldr) => (
                   <Badge
                     key={tldr}
                     variant="secondary"
-                    className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer justify-start text-left p-2"
+                    className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer justify-start text-left p-2 w-full max-w-full"
                     onClick={() => handleToggleTLDR(tldr)}
                   >
-                    <span className="flex-1 truncate">{tldr}</span>
+                    <span className="flex-1 truncate min-w-0">{tldr}</span>
                     <X className="ml-2 h-3 w-3 flex-shrink-0" />
                   </Badge>
                 ))}
@@ -626,16 +628,16 @@ export function KeywordSelectionPanel({
             
             {/* Selected Authors */}
             {selectedAuthors.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-3">
+              <div className="flex flex-wrap gap-2 mb-3 overflow-x-hidden">
                 {selectedAuthors.map((author) => (
                   <Badge
                     key={author}
                     variant="secondary"
-                    className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer"
+                    className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer max-w-full flex items-center gap-1"
                     onClick={() => handleToggleAuthor(author)}
                   >
-                    {author}
-                    <X className="ml-1 h-3 w-3" />
+                    <span className="truncate flex-1 min-w-0">{author}</span>
+                    <X className="h-3 w-3 flex-shrink-0" />
                   </Badge>
                 ))}
               </div>
@@ -645,19 +647,19 @@ export function KeywordSelectionPanel({
             {suggestedAuthors.length > 0 && (
               <div>
                 <p className="text-xs text-gray-500 mb-2">Suggested from chat store (current + parent nodes):</p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 overflow-x-hidden">
                   {suggestedAuthors.map((author) => (
                     <Badge
                       key={author}
                       variant="outline"
-                      className={`cursor-pointer border-[#2a2a2a] hover:border-[#22c55e] ${
+                      className={`cursor-pointer border-[#2a2a2a] hover:border-[#22c55e] max-w-full ${
                         selectedAuthors.includes(author)
                           ? 'bg-[#22c55e] text-black border-[#22c55e]'
                           : 'text-gray-300 hover:text-white'
                       }`}
                       onClick={() => handleToggleAuthor(author)}
                     >
-                      {author}
+                      <span className="truncate block max-w-[200px]">{author}</span>
                     </Badge>
                   ))}
                 </div>
@@ -677,16 +679,16 @@ export function KeywordSelectionPanel({
             
             {/* Selected References */}
             {selectedReferences.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-3">
+              <div className="flex flex-wrap gap-2 mb-3 overflow-x-hidden">
                 {selectedReferences.map((ref) => (
                   <Badge
                     key={ref}
                     variant="secondary"
-                    className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer max-w-xs truncate"
+                    className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer max-w-full flex items-center gap-1"
                     onClick={() => handleToggleReference(ref)}
                   >
-                    {ref}
-                    <X className="ml-1 h-3 w-3" />
+                    <span className="truncate flex-1 min-w-0">{ref}</span>
+                    <X className="h-3 w-3 flex-shrink-0" />
                   </Badge>
                 ))}
               </div>
@@ -696,19 +698,19 @@ export function KeywordSelectionPanel({
             {suggestedReferences.length > 0 && (
               <div>
                 <p className="text-xs text-gray-500 mb-2">Suggested from chat store (current + parent nodes):</p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 overflow-x-hidden">
                   {suggestedReferences.map((ref) => (
                     <Badge
                       key={ref}
                       variant="outline"
-                      className={`cursor-pointer border-[#2a2a2a] hover:border-[#22c55e] max-w-xs truncate ${
+                      className={`cursor-pointer border-[#2a2a2a] hover:border-[#22c55e] max-w-full ${
                         selectedReferences.includes(ref)
                           ? 'bg-[#22c55e] text-black border-[#22c55e]'
                           : 'text-gray-300 hover:text-white'
                       }`}
                       onClick={() => handleToggleReference(ref)}
                     >
-                      {ref}
+                      <span className="truncate block max-w-[200px]">{ref}</span>
                     </Badge>
                   ))}
                 </div>
@@ -760,16 +762,16 @@ export function KeywordSelectionPanel({
                   </Select>
                   {/* Show selected fields as removable badges */}
                   {selectedFieldsOfStudy.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
+                    <div className="flex flex-wrap gap-2 mt-2 overflow-x-hidden">
                       {selectedFieldsOfStudy.map((field) => (
                         <Badge
                           key={field}
                           variant="secondary"
-                          className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer"
+                          className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer max-w-full flex items-center gap-1"
                           onClick={() => handleToggleFieldOfStudy(field)}
                         >
-                          {field}
-                          <X className="ml-1 h-3 w-3" />
+                          <span className="truncate flex-1 min-w-0">{field}</span>
+                          <X className="h-3 w-3 flex-shrink-0" />
                         </Badge>
                       ))}
                     </div>
@@ -912,9 +914,11 @@ export function KeywordSelectionPanel({
               </div>
             )}
           </div>
+          </div>
         </div>
 
-        <DialogFooter>
+        {/* Sticky footer with action buttons */}
+        <DialogFooter className="px-6 py-4 border-t border-[#2a2a2a] bg-[#1f1f1f] flex-shrink-0 sticky bottom-0 z-10">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
