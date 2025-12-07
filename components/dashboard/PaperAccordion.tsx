@@ -127,13 +127,11 @@ export function PaperAccordion({ papers }: PaperAccordionProps) {
               {paper.pdfLink && (
                 <div className="pt-2">
                   <Button
-                    variant="outline"
-                    size="sm"
                     asChild
-                    className="border-green-500 text-green-500 hover:bg-green-500 hover:text-white"
+                    className="bg-[#22c55e] hover:bg-[#16a34a] text-black px-4 py-2"
                   >
-                    <a href={paper.pdfLink} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="mr-2 h-3 w-3" />
+                    <a href={paper.pdfLink} target="_blank" rel="noopener noreferrer" className="flex items-center">
+                      <ExternalLink className="mr-2 h-4 w-4" />
                       View PDF
                     </a>
                   </Button>

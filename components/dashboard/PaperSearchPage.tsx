@@ -709,15 +709,20 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
               )}
               <div className="flex gap-2 pt-2">
                 {searchResult.paper.pdfLink && (
-                  <a
-                    href={searchResult.paper.pdfLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-sm transition-colors"
+                  <Button
+                    asChild
+                    className="bg-[#22c55e] hover:bg-[#16a34a] text-black px-4 py-2"
                   >
-                    <ExternalLink className="h-4 w-4" />
-                    View PDF
-                  </a>
+                    <a
+                      href={searchResult.paper.pdfLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center"
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      View PDF
+                    </a>
+                  </Button>
                 )}
                 {searchResult.paper.link && (
                   <a
@@ -733,7 +738,7 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                 {searchResult.paper.id && (
                   <Button
                     onClick={() => setShowKeywordSelectionPanel(true)}
-                    className="bg-[#FF6B35] hover:bg-[#FF6B35]/80 text-white"
+                    className="bg-[#22c55e] hover:bg-[#16a34a] text-black"
                   >
                     <Search className="h-4 w-4 mr-2" />
                     Search Similar Papers
