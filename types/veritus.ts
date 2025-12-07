@@ -35,7 +35,7 @@ export interface VeritusJobResponse {
 }
 
 export interface VeritusJobStatus {
-  status: 'queued' | 'success' | 'error'
+  status: 'queued' | 'processing' | 'success' | 'error'
   results?: VeritusPaper[]
 }
 
