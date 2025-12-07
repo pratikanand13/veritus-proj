@@ -43,6 +43,7 @@ export async function GET(request: Request) {
       messages: chat.messages,
       depth: (chat as any).depth || 100,
       isFavorite: (chat as any).isFavorite || false,
+      chatMetadata: (chat as any).chatMetadata || {},
       createdAt: chat.createdAt,
       updatedAt: chat.updatedAt,
     }))
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
     await connectDB()
 
     const body = await request.json()
-    const { projectId, title, depth } = body
+    const { projectId, title, depth, paperData, messages: initialMessages } = body
 
     if (!projectId) {
       return NextResponse.json(
@@ -107,24 +108,88 @@ export async function POST(request: Request) {
       )
     }
 
+    // Initialize chat metadata
+    // IMPORTANT: Each chat has its own isolated chatMetadata field
+    // This ensures metadata from one chat session doesn't interfere with another
+    const chatMetadata: any = {
+      authors: [],
+      keywords: [],
+      abstracts: [],
+      tldrs: [],
+      publicationTypes: [],
+      publishedDates: [],
+      quartileRankings: [],
+      journalNames: [],
+      citationCounts: [],
+    }
+
+    // If paperData is provided, store it in chatMetadata and extract metadata
+    // This paperData is scoped to THIS specific chat instance only
+    // Also initialize chat store entry with heading as key
+    if (paperData) {
+      chatMetadata.paperData = paperData
+      
+      // Initialize chat store entry
+      // Key: abstract or title (heading)
+      // Value: Full API response with paper data
+      const heading = paperData.abstract || paperData.title || ''
+      if (heading) {
+        chatMetadata.chatStore = {
+          [heading]: {
+            heading,
+            paper: paperData,
+            similarPapers: [], // Empty initially, will be populated after similar search
+            apiResponse: { paper: paperData }, // Full API response
+          }
+        }
+      }
+      
+      if (paperData.authors) {
+        chatMetadata.authors = Array.isArray(paperData.authors) 
+          ? paperData.authors 
+          : paperData.authors.split(',').map((a: string) => a.trim())
+      }
+      if (paperData.abstract) {
+        chatMetadata.abstracts = [paperData.abstract]
+      }
+      if (paperData.tldr) {
+        chatMetadata.tldrs = [paperData.tldr]
+      }
+      if (paperData.journalName) {
+        chatMetadata.journalNames = [paperData.journalName]
+      }
+      if (paperData.citationCount) {
+        chatMetadata.citationCounts = [paperData.citationCount]
+      }
+      if (paperData.year) {
+        chatMetadata.publishedDates = [new Date(paperData.year, 0, 1)]
+      }
+      if (paperData.publicationType) {
+        chatMetadata.publicationTypes = [paperData.publicationType]
+      }
+    }
+
+    // Create initial message with paper data if paperData is provided
+    let messagesToStore = initialMessages && Array.isArray(initialMessages) ? initialMessages : []
+    
+    if (paperData && messagesToStore.length === 0) {
+      // Create initial message with paper data stored in chat store format
+      messagesToStore = [{
+        role: 'assistant',
+        content: `Paper: ${paperData.title || 'Untitled'}\n\nAuthors: ${paperData.authors || 'N/A'}\nYear: ${paperData.year || 'N/A'}\nJournal: ${paperData.journalName || 'N/A'}\n\n${paperData.abstract ? `Abstract: ${paperData.abstract}` : ''}\n\n${paperData.tldr ? `TLDR: ${paperData.tldr}` : ''}`,
+        timestamp: new Date(),
+        papers: [paperData], // Store paper in message.papers array
+      }]
+    }
+
     // Create chat with initialized metadata
     const chat = new Chat({
       projectId,
       userId: user.userId,
       title: title.trim(),
-      messages: [],
+      messages: messagesToStore,
       depth: depth !== undefined ? Math.max(1, Math.min(500, depth)) : 100,
-      chatMetadata: {
-        authors: [],
-        keywords: [],
-        abstracts: [],
-        tldrs: [],
-        publicationTypes: [],
-        publishedDates: [],
-        quartileRankings: [],
-        journalNames: [],
-        citationCounts: [],
-      },
+      chatMetadata,
     })
 
     await chat.save()
@@ -154,6 +219,7 @@ export async function POST(request: Request) {
           title: chat.title,
           messages: chat.messages,
           depth: (chat as any).depth || 100,
+          chatMetadata: (chat as any).chatMetadata || {},
           createdAt: chat.createdAt,
         },
       },

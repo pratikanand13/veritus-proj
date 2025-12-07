@@ -1,12 +1,29 @@
 import mongoose, { Schema, Model, Document } from 'mongoose'
 import bcrypt from 'bcryptjs'
 
+export interface Bookmark {
+  paperId: string
+  title: string
+  tldr?: string
+  authors?: string
+  keywords: string[]
+  bookmarkedAt: Date
+}
+
+export interface EmailNotificationHistory {
+  sentAt: Date
+  papersCount: number
+}
+
 export interface IUser extends Document {
   email: string
   password: string
   name: string
   areaOfInterest: string
   isAcademic: boolean
+  bookmarks: Bookmark[]
+  emailNotificationsEnabled: boolean
+  emailNotificationHistory: EmailNotificationHistory[]
   createdAt: Date
   comparePassword(candidatePassword: string): Promise<boolean>
 }
@@ -38,6 +55,32 @@ const UserSchema = new Schema<IUser>({
     type: Boolean,
     required: true,
     default: false,
+  },
+  bookmarks: {
+    type: [
+      {
+        paperId: { type: String, required: true },
+        title: { type: String, required: true },
+        tldr: { type: String },
+        authors: { type: String },
+        keywords: { type: [String], default: [] },
+        bookmarkedAt: { type: Date, default: Date.now },
+      },
+    ],
+    default: [],
+  },
+  emailNotificationsEnabled: {
+    type: Boolean,
+    default: true,
+  },
+  emailNotificationHistory: {
+    type: [
+      {
+        sentAt: { type: Date, required: true },
+        papersCount: { type: Number, default: 0 },
+      },
+    ],
+    default: [],
   },
   createdAt: {
     type: Date,

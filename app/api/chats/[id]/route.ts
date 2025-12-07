@@ -55,6 +55,7 @@ export async function GET(
         messages: chat.messages,
         depth: (chat as any).depth || 100,
         isFavorite: (chat as any).isFavorite || false,
+        chatMetadata: (chat as any).chatMetadata || {},
         createdAt: chat.createdAt,
         updatedAt: chat.updatedAt,
       },
@@ -98,7 +99,7 @@ export async function PUT(
     }
 
     const body = await request.json()
-    const { title, messages, depth, isFavorite } = body
+    const { title, messages, depth, isFavorite, chatMetadata } = body
 
     const updateData: any = {}
     if (title !== undefined) {
@@ -114,6 +115,28 @@ export async function PUT(
     }
     if (isFavorite !== undefined) {
       updateData.isFavorite = Boolean(isFavorite)
+      updateData.updatedAt = new Date()
+    }
+    // Fetch existing chat first if we need to merge chatMetadata
+    let existingChat = null
+    if (chatMetadata !== undefined) {
+      existingChat = await Chat.findOne({
+        _id: id,
+        userId: user.userId,
+      })
+      
+      if (existingChat) {
+        const existingMetadata = (existingChat as any).chatMetadata || {}
+        // Merge new metadata with existing, preserving chatStore
+        updateData.chatMetadata = {
+          ...existingMetadata,
+          ...chatMetadata,
+          // Preserve chatStore if it exists (initialized during creation)
+          chatStore: existingMetadata.chatStore || chatMetadata.chatStore,
+        }
+      } else {
+        updateData.chatMetadata = chatMetadata
+      }
       updateData.updatedAt = new Date()
     }
 
@@ -159,6 +182,7 @@ export async function PUT(
         messages: chat.messages,
         depth: (chat as any).depth || 100,
         isFavorite: (chat as any).isFavorite || false,
+        chatMetadata: (chat as any).chatMetadata || {},
         createdAt: chat.createdAt,
         updatedAt: chat.updatedAt,
       },

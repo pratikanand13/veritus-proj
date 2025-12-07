@@ -2,14 +2,12 @@ import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { getVeritusApiKey } from '@/lib/veritus-auth'
 import { createJob, getJobStatus } from '@/lib/veritus-api'
-import { normalizeMockFlag, isDebugMode } from '@/lib/config/mock-config'
+import { normalizeMockFlag } from '@/lib/config/mock-config'
 import { getMockCorpusResponse } from '@/lib/mock-data/mock-data-manager'
-import { updateChatMetadata, extractMetadataFromPapers, mergeMetadata } from '@/lib/utils/chat-metadata'
-import { ChatMetadata } from '@/models/Chat'
+import { updateChatMetadata, extractMetadataFromPapers, mergeMetadata, ChatMetadata } from '@/lib/utils/chat-metadata'
 import connectDB from '@/lib/db'
 import Chat from '@/models/Chat'
 import mongoose from 'mongoose'
-import { VeritusPaper } from '@/types/veritus'
 
 // Valid field values
 const VALID_FIELDS_OF_STUDY = [
@@ -38,15 +36,11 @@ interface SearchPapersRequest {
   phrases?: string[] // Required for keywordSearch and combinedSearch (3-10 phrases)
   enrich?: boolean
   callbackUrl?: string
-  isMocked?: boolean // Allow mock flag
-  _skipJobCreation?: boolean // Internal flag: skip job creation and use provided papers
-  _papers?: VeritusPaper[] // Internal: papers to use when skipping job creation
 }
 
 /**
  * POST /api/v1/papers/search-papers
  * Advanced paper search with filters using Veritus API job system
- * Mock data is allowed for Stage 4 testing
  */
 export async function POST(request: Request) {
   try {
@@ -58,39 +52,20 @@ export async function POST(request: Request) {
       )
     }
 
-    // Support both body and query parameters
-    const { searchParams } = new URL(request.url)
     const body: SearchPapersRequest = await request.json()
-    
-    // Merge query params with body (body takes precedence)
-    const fieldsOfStudy = body.fieldsOfStudy || searchParams.get('fieldsOfStudy') || undefined
-    const minCitationCount = body.minCitationCount !== undefined 
-      ? body.minCitationCount 
-      : searchParams.get('minCitationCount') 
-        ? parseInt(searchParams.get('minCitationCount')!, 10) 
-        : undefined
-    const openAccessPdf = body.openAccessPdf !== undefined
-      ? body.openAccessPdf
-      : searchParams.get('openAccessPdf')
-        ? searchParams.get('openAccessPdf') === 'true'
-        : undefined
-    const downloadable = body.downloadable !== undefined
-      ? body.downloadable
-      : searchParams.get('downloadable')
-        ? searchParams.get('downloadable') === 'true'
-        : undefined
-    const quartileRanking = body.quartileRanking || searchParams.get('quartileRanking') || undefined
-    const publicationTypes = body.publicationTypes || searchParams.get('publicationTypes') || undefined
-    const sort = body.sort || searchParams.get('sort') || undefined
-    const year = body.year || searchParams.get('year') || undefined
-    const chatId = body.chatId || searchParams.get('chatId') || undefined
-    const query = body.query || searchParams.get('query') || undefined
-    const phrases = body.phrases || (searchParams.get('phrases') ? searchParams.get('phrases')!.split(',').map(p => p.trim()) : undefined)
-    const skipJobCreation = body._skipJobCreation || false
-    const providedPapers = body._papers || undefined
-    const limit = body.limit || (searchParams.get('limit') ? parseInt(searchParams.get('limit')!, 10) as 100 | 200 | 300 : 100)
+    const {
+      fieldsOfStudy,
+      minCitationCount,
+      openAccessPdf,
+      downloadable,
+      quartileRanking,
+      publicationTypes,
+      chatId,
+      query,
+      phrases,
+    } = body
 
-    // Check if mock mode should be used (Stage 4 - Similar Paper Search)
+    // Check if mock mode should be used
     const useMock = normalizeMockFlag(body as any)
 
     // Validate fieldsOfStudy
@@ -166,66 +141,32 @@ export async function POST(request: Request) {
       )
     }
 
-    // Validate phrases and query before determining job type
-    const hasPhrases = phrases && Array.isArray(phrases) && phrases.length > 0
-    const hasQuery = query && typeof query === 'string' && query.trim().length > 0
-    
-    // Validate phrases count (3-10 for keywordSearch/combinedSearch)
-    if (hasPhrases) {
-      if (phrases.length < 3 || phrases.length > 10) {
-        return NextResponse.json(
-          { error: 'phrases must contain between 3 and 10 items for keywordSearch or combinedSearch' },
-          { status: 400 }
-        )
-      }
-    }
-    
-    // Validate query length (50-5000 for querySearch/combinedSearch)
-    if (hasQuery) {
-      const queryLength = query.trim().length
-      if (queryLength < 50 || queryLength > 5000) {
-        return NextResponse.json(
-          { error: 'query must be between 50 and 5000 characters for querySearch or combinedSearch' },
-          { status: 400 }
-        )
-      }
-    }
+    let papers: any[] = []
 
-    let papers: VeritusPaper[] = []
-
-    // If papers are provided directly (from frontend job polling), use them
-    if (skipJobCreation && providedPapers && providedPapers.length > 0) {
-      papers = providedPapers
-    } else if (useMock) {
-      // Return mock data (Stage 4 - Similar Paper Search)
-      // Add 3 second delay if DEBUG mode is enabled
-      if (isDebugMode()) {
-        await new Promise(resolve => setTimeout(resolve, 3000))
-      }
+    if (useMock) {
+      // Return mock data
       const mockData = getMockCorpusResponse()
       papers = [mockData.paper, ...mockData.similarPapers]
     } else {
       // Use Veritus API job system for advanced search
       const apiKey = await getVeritusApiKey()
       
-      // Determine job type based on validated input
+      // Determine job type based on input
       let jobType: 'keywordSearch' | 'querySearch' | 'combinedSearch' = 'querySearch'
       let jobBody: any = {}
 
-      if (hasPhrases && hasQuery) {
-        // Both phrases and query provided -> combinedSearch
-        jobType = 'combinedSearch'
-        jobBody = { phrases, query: query.trim() }
-      } else if (hasPhrases) {
-        // Only phrases provided -> keywordSearch
-        jobType = 'keywordSearch'
-        jobBody = { phrases }
-      } else if (hasQuery) {
-        // Only query provided -> querySearch
+      if (phrases && phrases.length >= 3 && phrases.length <= 10) {
+        jobType = phrases.length >= 3 && query ? 'combinedSearch' : 'keywordSearch'
+        if (jobType === 'combinedSearch') {
+          jobBody = { phrases, query: query || '' }
+        } else {
+          jobBody = { phrases }
+        }
+      } else if (query && query.length >= 50 && query.length <= 5000) {
         jobType = 'querySearch'
-        jobBody = { query: query.trim() }
+        jobBody = { query }
       } else {
-        // No phrases or query -> use querySearch with empty query (filters only)
+        // Default: use query search with empty query (will use filters only)
         jobType = 'querySearch'
         jobBody = { query: '' }
       }
@@ -233,7 +174,7 @@ export async function POST(request: Request) {
       // Create job with filters
       const jobParams = {
         jobType,
-        limit: limit as 100 | 200 | 300,
+        limit: 100 as const,
         fieldsOfStudy: fieldsOfStudyArray.length > 0 ? fieldsOfStudyArray : undefined,
         minCitationCount,
         openAccessPdf,
@@ -258,7 +199,7 @@ export async function POST(request: Request) {
           papers = jobStatus.results || []
           break
         } else if (jobStatus.status === 'error') {
-          throw new Error('Job failed')
+          throw new Error(jobStatus.error || 'Job failed')
         }
         
         attempts++
@@ -272,8 +213,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // Store papers in chat messages and update chat store if chatId provided
-    // IMPORTANT: This stores papers from similar-search for citation network generation
+    // Store papers in chat messages and metadata if chatId provided
+    // IMPORTANT: Metadata is scoped per chatId - each chat maintains its own isolated metadata
     if (chatId && papers.length > 0) {
       try {
         await connectDB()
@@ -296,34 +237,14 @@ export async function POST(request: Request) {
             const existingMetadata = chat.chatMetadata || {}
             const updatedMetadata = mergeMetadata(existingMetadata as ChatMetadata, metadata)
             
-            // Update chat store with similar papers (limit to 5 for graph)
-            // Find the root paper's heading from chatMetadata
-            if (chat.chatMetadata) {
-              const rootPaperHeading = chat.chatMetadata.paperData?.abstract || chat.chatMetadata.paperData?.title
-              if (rootPaperHeading && chat.chatMetadata.chatStore) {
-                const chatStore = chat.chatMetadata.chatStore as any
-                if (chatStore[rootPaperHeading]) {
-                  // Update similar papers (limit to 5)
-                  chatStore[rootPaperHeading].similarPapers = papers.slice(0, 5)
-                  chatStore[rootPaperHeading].apiResponse = {
-                    papers,
-                    total: papers.length,
-                    isMocked: useMock,
-                  }
-                  updatedMetadata.chatStore = chatStore
-                }
-              }
-            }
-            
             chat.chatMetadata = updatedMetadata
             
             // Store papers in chat messages automatically
-            // These papers will be used by citation-network API
             const searchMessage = {
               role: 'assistant' as const,
               content: `Found ${papers.length} similar papers`,
               timestamp: new Date(),
-              papers: papers, // Store all papers in the message for citation network
+              papers: papers, // Store all papers in the message
             }
             
             chat.messages.push(searchMessage)
@@ -335,6 +256,7 @@ export async function POST(request: Request) {
         // Log error but don't fail the request
         console.error('Error updating chat metadata and storing papers:', error)
       }
+    }
     }
 
     return NextResponse.json({
@@ -350,3 +272,4 @@ export async function POST(request: Request) {
     )
   }
 }
+

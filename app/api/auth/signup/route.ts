@@ -3,7 +3,7 @@ import connectDB from '@/lib/db'
 import User from '@/models/User'
 import { signupSchema } from '@/lib/validators'
 import { generateToken, setAuthCookie } from '@/lib/auth'
-import { isAcademicEmail } from '@/lib/academic-domains'
+import { classifyAcademicEmail } from '@/lib/academic-domains'
 
 export async function POST(request: Request) {
   try {
@@ -40,14 +40,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // Check if email is academic (already validated by schema, but double-check)
-    const isAcademic = isAcademicEmail(email)
-    if (!isAcademic) {
-      return NextResponse.json(
-        { error: 'Only academic email addresses are allowed for signup. Please use an IIT, NIT, or IIIT email.' },
-        { status: 400 }
-      )
-    }
+    // Classify email (fuzzy academic/research scoring). Do NOT block non-academic.
+    const classification = classifyAcademicEmail(email)
 
     // Create user
     const user = new User({
@@ -55,17 +49,16 @@ export async function POST(request: Request) {
       password,
       name,
       areaOfInterest,
-      isAcademic: true,
+      isAcademic: classification.isAcademic,
     })
 
     await user.save()
 
-    // Generate token - ensure academic users get 7 days
-    // Since only academic users can sign up, isAcademic should always be true
+    // Generate token - keep 7-day session; caller can inspect isAcademic if needed
     const token = generateToken({
       userId: user._id.toString(),
       email: user.email,
-      isAcademic: true, // Always true since only academic users can sign up
+      isAcademic: classification.isAcademic,
     })
 
     // Create response
@@ -78,6 +71,8 @@ export async function POST(request: Request) {
           name: user.name,
           areaOfInterest: user.areaOfInterest,
           isAcademic: user.isAcademic,
+          academicScore: classification.score,
+          matchedKeywords: classification.matchedKeywords,
         },
       },
       { status: 201 }

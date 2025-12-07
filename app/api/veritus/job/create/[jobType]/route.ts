@@ -1,13 +1,22 @@
 import { NextResponse } from 'next/server'
+import { getCurrentUser } from '@/lib/auth'
 import { getVeritusApiKey } from '@/lib/veritus-auth'
 import { createJob } from '@/lib/veritus-api'
+import { isDebugMode } from '@/lib/config/mock-config'
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ jobType: string }> }
 ) {
   try {
-    const apiKey = await getVeritusApiKey()
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
     const { jobType } = await params
 
     if (!['keywordSearch', 'querySearch', 'combinedSearch'].includes(jobType)) {
@@ -17,6 +26,19 @@ export async function POST(
       )
     }
 
+    // Check if DEBUG mode is enabled - return mock data
+    if (isDebugMode()) {
+      // Add 3 second delay for mock data
+      await new Promise(resolve => setTimeout(resolve, 3000))
+      
+      // Return mock job response
+      return NextResponse.json({
+        jobId: `mock-job-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        isMocked: true,
+      })
+    }
+
+    const apiKey = await getVeritusApiKey()
     const { searchParams } = new URL(request.url)
     const body = await request.json()
 

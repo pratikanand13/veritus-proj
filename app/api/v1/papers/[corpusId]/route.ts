@@ -53,17 +53,22 @@ export async function GET(
     }
 
     // Store in chat metadata if chatId provided
+    // IMPORTANT: Metadata is scoped per chatId - each chat maintains its own isolated metadata
     if (chatId) {
       try {
         await connectDB()
         
         if (mongoose.Types.ObjectId.isValid(chatId)) {
+          // Fetch the specific chat by chatId AND userId to ensure:
+          // 1. User can only update their own chats (security)
+          // 2. Metadata is isolated to this specific chat session
           const chat = await Chat.findOne({
             _id: chatId,
             userId: user.userId,
           })
 
           if (chat) {
+            // Update metadata for THIS specific chat only
             await updateChatMetadata(chat, paper)
             await chat.save()
           }

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { getVeritusApiKey } from '@/lib/veritus-auth'
 import { searchPapers } from '@/lib/veritus-api'
-import { normalizeMockFlag } from '@/lib/config/mock-config'
+import { normalizeMockFlag, isDebugMode } from '@/lib/config/mock-config'
 import { getMockSearchResponse } from '@/lib/mock-data/mock-data-manager'
 import { updateChatMetadata } from '@/lib/utils/chat-metadata'
 import connectDB from '@/lib/db'
@@ -34,13 +34,16 @@ export async function GET(request: Request) {
       )
     }
 
-    // Check if mock mode should be used
+    // Check if mock mode should be used (DEBUG=true uses mock data)
     const useMock = normalizeMockFlag({ isMocked: searchParams.get('mock') === 'true' })
 
     let paper
 
     if (useMock) {
-      // Return mock data
+      // Return mock data with 3 second delay if DEBUG mode is enabled
+      if (isDebugMode()) {
+        await new Promise(resolve => setTimeout(resolve, 3000))
+      }
       const mockData = getMockSearchResponse()
       paper = mockData.paper
     } else {
@@ -60,17 +63,22 @@ export async function GET(request: Request) {
     }
 
     // Store in chat metadata if chatId provided
+    // IMPORTANT: Metadata is scoped per chatId - each chat maintains its own isolated metadata
     if (chatId) {
       try {
         await connectDB()
         
         if (mongoose.Types.ObjectId.isValid(chatId)) {
+          // Fetch the specific chat by chatId AND userId to ensure:
+          // 1. User can only update their own chats (security)
+          // 2. Metadata is isolated to this specific chat session
           const chat = await Chat.findOne({
             _id: chatId,
             userId: user.userId,
           })
 
           if (chat) {
+            // Update metadata for THIS specific chat only
             await updateChatMetadata(chat, paper)
             await chat.save()
           }

@@ -2,6 +2,7 @@
  * Chat Paper Storage Hook
  * Robust system to track all API responses per chat
  * Stores papers in a map for fast lookup and keyword extraction
+ * Enhanced to store papers by heading/abstract with full API response
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -11,9 +12,24 @@ interface ChatPaperStorage {
   [paperId: string]: VeritusPaper
 }
 
+/**
+ * Chat Store Entry - stores paper with heading as key and full API response
+ */
+export interface ChatStoreEntry {
+  heading: string // abstract or title
+  paper: VeritusPaper // Full API response
+  similarPapers?: VeritusPaper[] // 5 papers for graph expansion
+  apiResponse?: any // Full API response object
+}
+
+interface ChatStore {
+  [heading: string]: ChatStoreEntry
+}
+
 interface ChatStorage {
   [chatId: string]: {
-    papers: ChatPaperStorage
+    papers: ChatPaperStorage // Backward compatibility - papers by ID
+    chatStore?: ChatStore // New structure - papers by heading/abstract
     lastUpdated: Date
   }
 }
@@ -43,12 +59,14 @@ export function useChatPaperStorage(chatId?: string | null, messages?: any[]) {
     if (!globalStorage[chatId]) {
       globalStorage[chatId] = {
         papers: {},
+        chatStore: {},
         lastUpdated: new Date(),
       }
     }
 
     // Extract all papers from messages
     const papersMap: ChatPaperStorage = {}
+    const chatStoreMap: ChatStore = {}
     
     if (messages && Array.isArray(messages)) {
       messages.forEach((message) => {
@@ -57,6 +75,28 @@ export function useChatPaperStorage(chatId?: string | null, messages?: any[]) {
           message.papers.forEach((paper: VeritusPaper) => {
             if (paper && paper.id) {
               papersMap[paper.id] = paper
+              
+              // Create chat store entry with heading as key
+              const heading = paper.abstract || paper.title
+              if (heading && !chatStoreMap[heading]) {
+                chatStoreMap[heading] = {
+                  heading,
+                  paper,
+                  similarPapers: [],
+                  apiResponse: message.papers.length === 1 ? { paper } : undefined,
+                }
+              }
+              
+              // If this is a similar paper, add to similarPapers array
+              if (heading && chatStoreMap[heading] && chatStoreMap[heading].paper.id !== paper.id) {
+                if (!chatStoreMap[heading].similarPapers) {
+                  chatStoreMap[heading].similarPapers = []
+                }
+                // Limit to 5 similar papers
+                if (chatStoreMap[heading].similarPapers!.length < 5) {
+                  chatStoreMap[heading].similarPapers!.push(paper)
+                }
+              }
             }
           })
         }
@@ -66,6 +106,16 @@ export function useChatPaperStorage(chatId?: string | null, messages?: any[]) {
           const paper = message.citationNetwork.paper
           if (paper && paper.id) {
             papersMap[paper.id] = paper
+            
+            const heading = paper.abstract || paper.title
+            if (heading && !chatStoreMap[heading]) {
+              chatStoreMap[heading] = {
+                heading,
+                paper,
+                similarPapers: message.citationNetwork.similarPapers || [],
+                apiResponse: message.citationNetwork,
+              }
+            }
           }
         }
 
@@ -96,6 +146,7 @@ export function useChatPaperStorage(chatId?: string | null, messages?: any[]) {
     // Update global storage
     globalStorage[chatId] = {
       papers: { ...globalStorage[chatId].papers, ...papersMap },
+      chatStore: { ...globalStorage[chatId].chatStore, ...chatStoreMap },
       lastUpdated: new Date(),
     }
 
@@ -117,12 +168,32 @@ export function useChatPaperStorage(chatId?: string | null, messages?: any[]) {
 
         if (chat && chat.messages) {
           const papersMap: ChatPaperStorage = {}
+          const chatStoreMap: ChatStore = {}
           
           chat.messages.forEach((message: any) => {
             if (message.papers && Array.isArray(message.papers)) {
               message.papers.forEach((paper: VeritusPaper) => {
                 if (paper && paper.id) {
                   papersMap[paper.id] = paper
+                  
+                  const heading = paper.abstract || paper.title
+                  if (heading && !chatStoreMap[heading]) {
+                    chatStoreMap[heading] = {
+                      heading,
+                      paper,
+                      similarPapers: [],
+                      apiResponse: message.papers.length === 1 ? { paper } : undefined,
+                    }
+                  }
+                  
+                  if (heading && chatStoreMap[heading] && chatStoreMap[heading].paper.id !== paper.id) {
+                    if (!chatStoreMap[heading].similarPapers) {
+                      chatStoreMap[heading].similarPapers = []
+                    }
+                    if (chatStoreMap[heading].similarPapers!.length < 5) {
+                      chatStoreMap[heading].similarPapers!.push(paper)
+                    }
+                  }
                 }
               })
             }
@@ -131,6 +202,16 @@ export function useChatPaperStorage(chatId?: string | null, messages?: any[]) {
               const paper = message.citationNetwork.paper
               if (paper && paper.id) {
                 papersMap[paper.id] = paper
+                
+                const heading = paper.abstract || paper.title
+                if (heading && !chatStoreMap[heading]) {
+                  chatStoreMap[heading] = {
+                    heading,
+                    paper,
+                    similarPapers: message.citationNetwork.similarPapers || [],
+                    apiResponse: message.citationNetwork,
+                  }
+                }
               }
             }
 
@@ -154,6 +235,7 @@ export function useChatPaperStorage(chatId?: string | null, messages?: any[]) {
           // Update global storage
           globalStorage[chatId] = {
             papers: papersMap,
+            chatStore: chatStoreMap,
             lastUpdated: new Date(),
           }
 
@@ -169,20 +251,55 @@ export function useChatPaperStorage(chatId?: string | null, messages?: any[]) {
   }, [chatId])
 
   // Add paper to storage
-  const addPaper = useCallback((paper: VeritusPaper) => {
+  const addPaper = useCallback((paper: VeritusPaper, apiResponse?: any) => {
     if (!chatId || !paper || !paper.id) return
 
     if (!globalStorage[chatId]) {
       globalStorage[chatId] = {
         papers: {},
+        chatStore: {},
         lastUpdated: new Date(),
       }
     }
 
     globalStorage[chatId].papers[paper.id] = paper
+    
+    // Add to chat store with heading as key
+    const heading = paper.abstract || paper.title
+    if (heading) {
+      if (!globalStorage[chatId].chatStore) {
+        globalStorage[chatId].chatStore = {}
+      }
+      
+      if (!globalStorage[chatId].chatStore![heading]) {
+        globalStorage[chatId].chatStore![heading] = {
+          heading,
+          paper,
+          similarPapers: [],
+          apiResponse,
+        }
+      }
+    }
+    
     globalStorage[chatId].lastUpdated = new Date()
 
     setStorage({ ...globalStorage[chatId].papers })
+  }, [chatId])
+  
+  // Get chat store entry by heading
+  const getChatStoreEntry = useCallback((heading: string): ChatStoreEntry | null => {
+    if (!chatId || !globalStorage[chatId] || !globalStorage[chatId].chatStore) {
+      return null
+    }
+    return globalStorage[chatId].chatStore![heading] || null
+  }, [chatId])
+  
+  // Get all chat store entries
+  const getAllChatStoreEntries = useCallback((): ChatStoreEntry[] => {
+    if (!chatId || !globalStorage[chatId] || !globalStorage[chatId].chatStore) {
+      return []
+    }
+    return Object.values(globalStorage[chatId].chatStore!)
   }, [chatId])
 
   // Get all papers
@@ -250,6 +367,32 @@ export function useChatPaperStorage(chatId?: string | null, messages?: any[]) {
     return Array.from(references).sort()
   }, [storage])
 
+  // Extract TLDRs from all papers in storage
+  const extractTLDRs = useCallback((): string[] => {
+    const tldrs = new Set<string>()
+    
+    Object.values(storage).forEach((paper) => {
+      if (paper.tldr && paper.tldr.trim()) {
+        tldrs.add(paper.tldr.trim())
+      }
+    })
+
+    return Array.from(tldrs)
+  }, [storage])
+
+  // Extract years from all papers in storage
+  const extractYears = useCallback((): number[] => {
+    const years = new Set<number>()
+    
+    Object.values(storage).forEach((paper) => {
+      if (paper.year && typeof paper.year === 'number') {
+        years.add(paper.year)
+      }
+    })
+
+    return Array.from(years).sort((a, b) => b - a) // Sort descending
+  }, [storage])
+
   return {
     storage,
     isLoading,
@@ -261,6 +404,10 @@ export function useChatPaperStorage(chatId?: string | null, messages?: any[]) {
     extractKeywords,
     extractAuthors,
     extractReferences,
+    extractTLDRs,
+    extractYears,
+    getChatStoreEntry,
+    getAllChatStoreEntries,
     paperCount: Object.keys(storage).length,
   }
 }

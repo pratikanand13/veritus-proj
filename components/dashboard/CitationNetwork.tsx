@@ -13,9 +13,11 @@ interface CitationNetworkProps {
   citationNetworkResponse?: CitationNetworkResponse
   width?: number
   height?: number
+  onNodeClick?: (paper: VeritusPaper) => void
+  chatId?: string | null
 }
 
-export function CitationNetwork({ papers, citationNetworkResponse, width = 800, height = 600 }: CitationNetworkProps) {
+export function CitationNetwork({ papers, citationNetworkResponse, width = 800, height = 600, onNodeClick, chatId }: CitationNetworkProps) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [zoomLevel, setZoomLevel] = useState(1)
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
@@ -37,10 +39,20 @@ export function CitationNetwork({ papers, citationNetworkResponse, width = 800, 
           nodes: citationNetworkResponse.citationNetwork.nodes.map(node => ({
             id: node.id,
             label: node.label,
-            paper: {
+            paper: (node.data as VeritusPaper) || {
               id: node.id,
               title: node.label,
               impactFactor: { citationCount: node.citations },
+              authors: node.authors || '',
+              year: node.year,
+              journalName: null,
+              abstract: null,
+              tldr: null,
+              fieldsOfStudy: [],
+              publicationType: null,
+              downloadable: false,
+              doi: null,
+              pdfLink: null,
             } as VeritusPaper,
             x: 0,
             y: 0,
@@ -142,8 +154,32 @@ export function CitationNetwork({ papers, citationNetworkResponse, width = 800, 
       .attr('stroke', '#1e40af')
       .attr('stroke-width', 2)
       .style('cursor', 'pointer')
-      .on('click', (event, d) => {
+      .on('click', async (event, d) => {
+        event.stopPropagation()
         setSelectedNode(selectedNode === d.id ? null : d.id)
+        // Call onNodeClick if paper data is available
+        if (onNodeClick && d.paper) {
+          // If paper data is incomplete, try to fetch full details
+          let paperData = d.paper
+          if (!paperData.abstract && !paperData.tldr && chatId) {
+            // Try to get full paper data from cache or API
+            try {
+              const paperId = paperData.id?.replace('paper-', '').replace('root-', '')
+              if (paperId) {
+                const response = await fetch(`/api/v1/papers/${paperId}?chatId=${chatId}&mock=true`)
+                if (response.ok) {
+                  const data = await response.json()
+                  if (data.paper) {
+                    paperData = data.paper
+                  }
+                }
+              }
+            } catch (error) {
+              console.error('Error fetching paper details:', error)
+            }
+          }
+          onNodeClick(paperData)
+        }
       })
       .call(drag(simulation))
 
@@ -217,7 +253,7 @@ export function CitationNetwork({ papers, citationNetworkResponse, width = 800, 
       tooltip.remove()
       simulation.stop()
     }
-  }, [papers, selectedNode, width, height])
+  }, [papers, citationNetworkResponse, selectedNode, width, height, onNodeClick, chatId])
 
   const handleZoomIn = () => {
     if (svgRef.current) {
