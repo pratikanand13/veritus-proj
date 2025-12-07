@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth'
 import { getVeritusApiKey } from '@/lib/veritus-auth'
-import { createJob } from '@/lib/veritus-api'
+import { createJob, getPaper } from '@/lib/veritus-api'
 import { isDebugMode } from '@/lib/config/mock-config'
 import connectDB from '@/lib/db'
 import Chat from '@/models/Chat'
@@ -45,45 +45,62 @@ export async function POST(
     const body = await request.json()
 
     // Pad phrases array if needed (Veritus API requires minimum 3 phrases)
-    // When user selects only 1-2 keywords, we pad with paper metadata from chatstore
+    // When user selects only 1-2 keywords, we pad with paper metadata from chatstore or by fetching paper directly
     if ((jobType === 'keywordSearch' || jobType === 'combinedSearch') && body.phrases && Array.isArray(body.phrases)) {
       const originalPhrases = body.phrases
       if (originalPhrases.length > 0 && originalPhrases.length < 3) {
         const chatId = searchParams.get('chatId') || body.chatId
+        const corpusId = body.corpusId || searchParams.get('corpusId')
         let paddedPhrases = [...originalPhrases]
+        let paperData: any = null
         
+        // First, try to get paper data from chat metadata
         if (chatId) {
           try {
             await connectDB()
             const chat = await Chat.findOne({ _id: chatId, userId: user.userId })
             if (chat?.chatMetadata?.paperData) {
-              const paperData = chat.chatMetadata.paperData
-              
-              // Add paper title if not already in phrases
-              if (paperData.title && !paddedPhrases.some(p => p.toLowerCase() === paperData.title.toLowerCase())) {
-                paddedPhrases.push(paperData.title)
-              }
-              
-              // Add fields of study if available
-              if (paperData.fieldsOfStudy && Array.isArray(paperData.fieldsOfStudy)) {
-                for (const field of paperData.fieldsOfStudy) {
-                  if (paddedPhrases.length >= 3) break
-                  if (field && !paddedPhrases.some(p => p.toLowerCase() === field.toLowerCase())) {
-                    paddedPhrases.push(field)
-                  }
-                }
-              }
-              
-              // Add publication type if available
-              if (paperData.publicationType && paddedPhrases.length < 3) {
-                if (!paddedPhrases.some(p => p.toLowerCase() === paperData.publicationType.toLowerCase())) {
-                  paddedPhrases.push(paperData.publicationType)
-                }
-              }
+              paperData = chat.chatMetadata.paperData
             }
           } catch (error) {
-            // If we can't get paper data, log but continue
-            // We'll check if padding was successful below
+            // If we can't get paper data from chat, continue to try fetching by corpusId
+            console.error('Error fetching paper data from chat:', error)
+          }
+        }
+        
+        // If chat doesn't have paperData, try to fetch paper directly using corpusId
+        if (!paperData && corpusId) {
+          try {
+            const apiKey = await getVeritusApiKey()
+            paperData = await getPaper(corpusId.trim(), { apiKey })
+          } catch (error) {
+            // If we can't fetch paper, log but continue
+            console.error('Error fetching paper by corpusId:', error)
+          }
+        }
+        
+        // Use paperData to pad phrases if available
+        if (paperData) {
+          // Add paper title if not already in phrases
+          if (paperData.title && !paddedPhrases.some(p => p.toLowerCase() === paperData.title.toLowerCase())) {
+            paddedPhrases.push(paperData.title)
+          }
+          
+          // Add fields of study if available
+          if (paperData.fieldsOfStudy && Array.isArray(paperData.fieldsOfStudy)) {
+            for (const field of paperData.fieldsOfStudy) {
+              if (paddedPhrases.length >= 3) break
+              if (field && !paddedPhrases.some(p => p.toLowerCase() === field.toLowerCase())) {
+                paddedPhrases.push(field)
+              }
+            }
+          }
+          
+          // Add publication type if available
+          if (paperData.publicationType && paddedPhrases.length < 3) {
+            if (!paddedPhrases.some(p => p.toLowerCase() === paperData.publicationType.toLowerCase())) {
+              paddedPhrases.push(paperData.publicationType)
+            }
           }
         }
         

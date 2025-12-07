@@ -353,124 +353,275 @@ export function CitationNetworkEnhanced({
         tooltip.transition().duration(200).style('opacity', 0)
       })
 
-    // Create labels
+    // Create wrapped labels using foreignObject for proper text wrapping
+    const maxLabelWidth = 120 // Fixed max width for wrapping
+    const labelOffset = 15 // Horizontal offset from node center
+    const fontSize = 10
+    const lineHeight = fontSize * 1.2
+    
     const labels = g.append('g')
       .attr('class', 'labels')
-      .selectAll('text')
+      .selectAll('g.label-group')
       .data(displayData.nodes)
       .enter()
-      .append('text')
-      .text((d) => {
-        const title = d.label || 'Unknown'
-        return title.length > 30 ? title.substring(0, 30) + '...' : title
-      })
-      .attr('font-size', '10px')
-      .attr('fill', '#e5e7eb')
-      .attr('dx', 15)
-      .attr('dy', 4)
+      .append('g')
+      .attr('class', 'label-group')
       .style('opacity', showLabels ? 1 : 0)
       .style('pointer-events', 'none')
+    
+    // Create foreignObject for each label to enable text wrapping
+    const labelForeignObjects = labels.append('foreignObject')
+      .attr('width', maxLabelWidth)
+      .attr('height', (d) => {
+        const { height } = wrapText(d.label || 'Unknown', maxLabelWidth)
+        return height
+      })
+      .attr('x', labelOffset)
+      .attr('y', (d) => {
+        const { height } = wrapText(d.label || 'Unknown', maxLabelWidth)
+        return -height / 2 // Vertically center the label
+      })
+    
+    // Create div elements inside foreignObject for text wrapping
+    labelForeignObjects.append('xhtml:div')
+      .style('font-size', `${fontSize}px`)
+      .style('color', '#e5e7eb')
+      .style('line-height', `${lineHeight}px`)
+      .style('font-family', 'system-ui, -apple-system, sans-serif')
+      .style('word-wrap', 'break-word')
+      .style('overflow-wrap', 'break-word')
+      .style('white-space', 'normal')
+      .style('width', `${maxLabelWidth}px`)
+      .html((d) => {
+        const { wrappedLines } = wrapText(d.label || 'Unknown', maxLabelWidth)
+        // Escape HTML and join lines with <br>
+        return wrappedLines
+          .map(line => line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+          .join('<br>')
+      })
 
     // Apply layout
     let simulation: d3.Simulation<any, any> | null = null
 
-    // Ensure nodes have D3 simulation properties
-    // Type assertion needed because CitationNetworkNode doesn't include simulation properties in its type
-    const nodesWithSimulationProps = displayData.nodes.map(node => {
+    // Ensure nodes have D3 simulation properties with better initial positioning
+    // Distribute nodes in a wider area initially to prevent clustering
+    const nodesWithSimulationProps = displayData.nodes.map((node, i) => {
       const nodeWithProps = node as CitationNetworkNode & Partial<d3.SimulationNodeDatum>
+      // If node doesn't have position, initialize it in a wider distribution
+      const hasPosition = (nodeWithProps as any).x !== undefined && (nodeWithProps as any).x !== null
+      if (!hasPosition) {
+        // Use a spiral or wider random distribution for better initial spread
+        const angle = (i / displayData.nodes.length) * 2 * Math.PI
+        const radius = Math.min(width, height) * 0.3 * (0.5 + Math.random() * 0.5)
+        ;(nodeWithProps as any).x = width / 2 + radius * Math.cos(angle)
+        ;(nodeWithProps as any).y = height / 2 + radius * Math.sin(angle)
+      }
       return {
         ...nodeWithProps,
-        x: (nodeWithProps as any).x ?? undefined,
-        y: (nodeWithProps as any).y ?? undefined,
-        vx: (nodeWithProps as any).vx ?? undefined,
-        vy: (nodeWithProps as any).vy ?? undefined,
+        x: (nodeWithProps as any).x ?? width / 2 + (Math.random() - 0.5) * width * 0.3,
+        y: (nodeWithProps as any).y ?? height / 2 + (Math.random() - 0.5) * height * 0.3,
+        vx: (nodeWithProps as any).vx ?? 0,
+        vy: (nodeWithProps as any).vy ?? 0,
         fx: (nodeWithProps as any).fx ?? undefined,
         fy: (nodeWithProps as any).fy ?? undefined,
       } as CitationNetworkNode & d3.SimulationNodeDatum
     })
 
-    // Calculate dynamic collision radius that accounts for node, label, and keywords box
+    // Helper function to wrap text and calculate dimensions
+    const wrapText = (text: string, maxWidth: number): { wrappedLines: string[], width: number, height: number } => {
+      const words = text.split(/\s+/).filter(word => word.length > 0)
+      const fontSize = 10
+      const lineHeight = fontSize * 1.2
+      const avgCharWidth = 6 // Average character width for 10px font
+      
+      if (words.length === 0) {
+        return { wrappedLines: [''], width: 0, height: lineHeight }
+      }
+      
+      const lines: string[] = []
+      let currentLine = words[0]
+      
+      for (let i = 1; i < words.length; i++) {
+        const word = words[i]
+        const testLine = currentLine + ' ' + word
+        const testWidth = testLine.length * avgCharWidth
+        
+        if (testWidth > maxWidth && currentLine.length > 0) {
+          lines.push(currentLine)
+          currentLine = word
+        } else {
+          currentLine = testLine
+        }
+      }
+      lines.push(currentLine)
+      
+      // Calculate actual width (longest line)
+      const maxLineWidth = Math.max(...lines.map(line => line.length * avgCharWidth))
+      const totalHeight = lines.length * lineHeight
+      
+      return {
+        wrappedLines: lines,
+        width: Math.min(maxLineWidth, maxWidth),
+        height: totalHeight
+      }
+    }
+    
+    // Calculate dynamic collision radius that accounts for node, wrapped label, and spacing
+    // This ensures nodes and their labels don't overlap
     const getCollisionRadius = (node: CitationNetworkNode) => {
       const nodeRadius = getNodeSize(node, sortBy)
       const label = node.label || 'Unknown'
       
-      // Estimate label width (10px font size, ~6px per character average)
-      const labelText = label.length > 30 ? label.substring(0, 30) + '...' : label
-      const estimatedLabelWidth = labelText.length * 6
-      const labelOffset = 15 // dx offset from node center
-      const labelPadding = 10 // extra padding around label
+      // Wrap text to calculate actual label dimensions
+      const maxLabelWidth = 120 // Fixed max width for wrapping
+      const labelOffset = 15 // dx offset from node center (label starts here)
+      const labelPadding = 20 // Extra padding around label for readability
       
-      // Account for keywords box area (typically on the right side, ~200-300px wide)
-      const keywordsBoxPadding = 250 // Reserve space for keywords box on right side
+      const { width: labelWidth, height: labelHeight } = wrapText(label, maxLabelWidth)
       
-      // Calculate total width needed (node + label + padding)
-      const totalWidth = nodeRadius + labelOffset + estimatedLabelWidth + labelPadding
+      // Calculate the full bounding box dimensions
+      // Label extends from node center + labelOffset to node center + labelOffset + labelWidth
+      const totalWidth = nodeRadius + labelOffset + labelWidth + labelPadding
+      const totalHeight = Math.max(nodeRadius * 2, labelHeight + labelPadding)
       
-      // Use the larger of: node radius + label width, or minimum spacing
-      // Also consider keywords box area - nodes should avoid right side
-      const baseCollisionRadius = Math.max(
-        totalWidth / 2, // Half of total width for circular collision
-        nodeRadius + 40 // Minimum spacing
+      // Use the larger dimension to create a circular collision radius
+      // This ensures nodes don't overlap even when labels are at different angles
+      const maxDimension = Math.max(totalWidth, totalHeight)
+      
+      // Scale collision radius based on number of nodes for better spacing
+      const nodeCount = displayData.nodes.length
+      const densityFactor = Math.max(1, Math.sqrt(nodeCount / 10)) // Scale up for more nodes
+      const minSpacing = 50 * densityFactor // Minimum spacing increases with node count
+      
+      // Return the larger of: calculated radius or minimum spacing
+      const collisionRadius = Math.max(
+        maxDimension / 2, // Half of max dimension for circular collision
+        nodeRadius + minSpacing // Minimum spacing from node edge
       )
       
-      return baseCollisionRadius
+      return collisionRadius
     }
+    
+    // Calculate dynamic spacing parameters based on graph size
+    const nodeCount = displayData.nodes.length
+    const edgeCount = displayData.edges.length
+    const graphDensity = edgeCount / Math.max(nodeCount, 1)
+    
+    // Scale forces based on graph characteristics
+    const baseChargeStrength = -800
+    const chargeMultiplier = Math.max(1, Math.sqrt(nodeCount / 5)) // Stronger repulsion for more nodes
+    const linkDistanceBase = 150 // Base link distance
+    const linkDistanceMultiplier = Math.max(1, Math.sqrt(nodeCount / 8)) // Longer links for more nodes
 
     switch (layout) {
       case 'force':
         // Create boundary to keep nodes away from right edge (where keywords box might be)
         const boundaryPadding = 300 // Reserve space for keywords box
         const boundaryWidth = width - boundaryPadding
+        const centerX = (boundaryWidth + boundaryPadding / 2) / 2
+        const centerY = height / 2
+        
+        // Optimize simulation parameters to prevent overlaps
+        // CRITICAL: Slow alpha decay to allow simulation to run longer and settle properly
+        // For linear graphs, we need more iterations to separate nodes
+        const alphaDecay = 0.01 // Much slower decay (was 0.01-0.05, now fixed at 0.01)
+        const alphaMin = 0.0001 // Lower minimum to allow more thorough settling
         
         simulation = d3.forceSimulation<CitationNetworkNode & d3.SimulationNodeDatum>(nodesWithSimulationProps)
-          .alpha(1) // Start with high energy for better initial positioning
-          .alphaDecay(0.022) // Slower decay for more iterations (default is 0.0228)
-          .alphaMin(0.001) // Lower minimum for more thorough settling
-          .velocityDecay(0.4) // More damping for stability
+          .alpha(1) // Start with high energy
+          .alphaDecay(alphaDecay) // Slow decay for more iterations
+          .alphaMin(alphaMin) // Very low minimum for thorough settling
+          .velocityDecay(0.4) // Moderate damping to allow movement
+          // CRITICAL FIX #1: Lower link strength to prevent link force from overriding collision
           .force('link', d3.forceLink<CitationNetworkNode & d3.SimulationNodeDatum, CitationNetworkEdge>(displayData.edges)
             .id((d: any) => d.id)
             .distance((d: any) => {
-              // Increase link distance based on collision radius to prevent overlap
+              // Dynamic link distance based on collision radius
               const sourceRadius = getCollisionRadius(d.source as CitationNetworkNode)
               const targetRadius = getCollisionRadius(d.target as CitationNetworkNode)
-              return sourceRadius + targetRadius + 80 // Increased minimum distance between node edges
+              const baseDistance = sourceRadius + targetRadius + (linkDistanceBase * linkDistanceMultiplier)
+              // Adjust based on edge weight if available
+              const weight = typeof d.weight === 'number' ? d.weight : 1
+              return baseDistance * (0.8 + weight * 0.4)
             })
-            .strength(0.3)) // Weaker link strength to allow more movement
+            .strength(0.1)) // CRITICAL: Low link strength (was 0.5-1.5) to prevent overriding collision
+          // CRITICAL FIX #2: Stronger repulsion to push nodes apart
           .force('charge', d3.forceManyBody().strength((d: any) => {
-            // Stronger repulsion for better spacing
             const nodeRadius = getCollisionRadius(d as CitationNetworkNode)
-            return -1200 * (1 + nodeRadius / 15) // Increased repulsion, scales with node size
+            // Increase base charge strength for better separation
+            const baseCharge = baseChargeStrength * chargeMultiplier * 1.5 // 50% stronger
+            const sizeFactor = 1 + (nodeRadius / 50)
+            return baseCharge * sizeFactor
           }))
-          .force('center', d3.forceCenter((boundaryWidth + boundaryPadding / 2) / 2, height / 2).strength(0.1))
+          .force('center', d3.forceCenter(centerX, centerY).strength(0.02)) // Weaker center force
+          // CRITICAL FIX #3: Collision force MUST be strong and run after link forces
+          // Force order matters - collision should be last to override other forces
           .force('collision', d3.forceCollide()
-            .radius((d: any) => getCollisionRadius(d as CitationNetworkNode))
-            .strength(0.8)) // Strong collision detection
-          .force('x', d3.forceX((boundaryWidth + boundaryPadding / 2) / 2).strength(0.03)) // Gentle pull to center, avoiding right edge
-          .force('y', d3.forceY(height / 2).strength(0.03))
+            .radius((d: any) => {
+              // Use full collision radius including label dimensions
+              return getCollisionRadius(d as CitationNetworkNode) * 1.15 // 15% padding for safety
+            })
+            .strength(1.0) // Maximum strength
+            .iterations(2)) // Multiple iterations per tick for better collision resolution
+          .force('x', d3.forceX(centerX).strength(0.01)) // Very weak X pull
+          .force('y', d3.forceY(centerY).strength(0.01)) // Very weak Y pull
+          // CRITICAL FIX #4: Add strong separation force to push nodes apart
+          .force('separation', (alpha: number) => {
+            // Additional separation force to prevent clustering
+            const padding = 5 // Minimum separation padding
+            nodesWithSimulationProps.forEach((nodeA: any, i: number) => {
+              const radiusA = getCollisionRadius(nodeA as CitationNetworkNode)
+              nodesWithSimulationProps.forEach((nodeB: any, j: number) => {
+                if (i >= j) return
+                const radiusB = getCollisionRadius(nodeB as CitationNetworkNode)
+                const minDistance = radiusA + radiusB + padding
+                
+                if (nodeA.x !== undefined && nodeA.y !== undefined &&
+                    nodeB.x !== undefined && nodeB.y !== undefined) {
+                  const dx = (nodeB.x as number) - (nodeA.x as number)
+                  const dy = (nodeB.y as number) - (nodeA.y as number)
+                  const distance = Math.sqrt(dx * dx + dy * dy) || 1
+                  
+                  if (distance < minDistance) {
+                    // Push nodes apart
+                    const force = (minDistance - distance) / distance * alpha * 0.5
+                    const fx = dx * force
+                    const fy = dy * force
+                    nodeA.vx = (nodeA.vx || 0) - fx
+                    nodeA.vy = (nodeA.vy || 0) - fy
+                    nodeB.vx = (nodeB.vx || 0) + fx
+                    nodeB.vy = (nodeB.vy || 0) + fy
+                  }
+                }
+              })
+            })
+          })
           .force('boundary', (alpha: number) => {
-            // Custom boundary force to keep nodes away from right edge (keywords box area)
+            // Enhanced boundary force to keep nodes within bounds
             nodesWithSimulationProps.forEach((node: any) => {
               const radius = getCollisionRadius(node as CitationNetworkNode)
+              const padding = 10 // Extra padding from edges
+              
               if (node.x !== undefined && node.x !== null) {
-                // Keep nodes away from right edge (keywords box area) - stronger force
-                if (node.x + radius > boundaryWidth) {
-                  const pushBack = (node.x + radius - boundaryWidth) * alpha * 1.2
+                // Keep nodes away from right edge (keywords box area)
+                if (node.x + radius > boundaryWidth - padding) {
+                  const pushBack = (node.x + radius - (boundaryWidth - padding)) * alpha * 2.0
                   node.vx = (node.vx || 0) - pushBack
                 }
                 // Keep nodes away from left edge
-                if (node.x - radius < 0) {
-                  const pushBack = (radius - node.x) * alpha * 1.2
+                if (node.x - radius < padding) {
+                  const pushBack = ((padding + radius) - node.x) * alpha * 2.0
                   node.vx = (node.vx || 0) + pushBack
                 }
               }
               if (node.y !== undefined && node.y !== null) {
                 // Keep nodes within vertical bounds
-                if (node.y + radius > height) {
-                  const pushBack = (node.y + radius - height) * alpha * 1.2
+                if (node.y + radius > height - padding) {
+                  const pushBack = (node.y + radius - (height - padding)) * alpha * 2.0
                   node.vy = (node.vy || 0) - pushBack
                 }
-                if (node.y - radius < 0) {
-                  const pushBack = (radius - node.y) * alpha * 1.2
+                if (node.y - radius < padding) {
+                  const pushBack = ((padding + radius) - node.y) * alpha * 2.0
                   node.vy = (node.vy || 0) + pushBack
                 }
               }
@@ -524,75 +675,110 @@ export function CitationNetworkEnhanced({
     }
 
     if (simulation) {
+      // Stop previous simulation if it exists
+      if (simulationRef.current) {
+        simulationRef.current.stop()
+      }
       simulationRef.current = simulation
+      
+      // Add end event listener to ensure simulation completes smoothly
+      simulation.on('end', () => {
+        // Ensure final positions are set
+        node.attr('cx', (d: any) => (d as any).x || 0).attr('cy', (d: any) => (d as any).y || 0)
+        labels.attr('transform', (d: any) => {
+          const x = (d as any).x || 0
+          const y = (d as any).y || 0
+          return `translate(${x},${y})`
+        })
+      })
+      
       simulation.on('tick', () => {
+        // Update link positions
         link
           .attr('x1', (d: any) => {
             const source = typeof d.source === 'string' 
-              ? displayData.nodes.find(n => n.id === d.source)
+              ? nodesWithSimulationProps.find(n => n.id === d.source)
               : d.source
             const sourceWithProps = source as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
             return (sourceWithProps as any)?.x || 0
           })
           .attr('y1', (d: any) => {
             const source = typeof d.source === 'string' 
-              ? displayData.nodes.find(n => n.id === d.source)
+              ? nodesWithSimulationProps.find(n => n.id === d.source)
               : d.source
             const sourceWithProps = source as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
             return (sourceWithProps as any)?.y || 0
           })
           .attr('x2', (d: any) => {
             const target = typeof d.target === 'string' 
-              ? displayData.nodes.find(n => n.id === d.target)
+              ? nodesWithSimulationProps.find(n => n.id === d.target)
               : d.target
             const targetWithProps = target as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
             return (targetWithProps as any)?.x || 0
           })
           .attr('y2', (d: any) => {
             const target = typeof d.target === 'string' 
-              ? displayData.nodes.find(n => n.id === d.target)
+              ? nodesWithSimulationProps.find(n => n.id === d.target)
               : d.target
             const targetWithProps = target as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
             return (targetWithProps as any)?.y || 0
           })
 
+        // Update node and label positions smoothly
         node.attr('cx', (d: any) => (d as any).x || 0).attr('cy', (d: any) => (d as any).y || 0)
-        labels.attr('x', (d: any) => (d as any).x || 0).attr('y', (d: any) => (d as any).y || 0)
+        // Position label groups at node center (foreignObject handles offset internally)
+        labels.attr('transform', (d: any) => {
+          const x = (d as any).x || 0
+          const y = (d as any).y || 0
+          return `translate(${x},${y})`
+        })
       })
     } else {
-      // Static layout - update positions immediately
+      // Static layout - update positions immediately using nodesWithSimulationProps
       link
         .attr('x1', (d: any) => {
           const source = typeof d.source === 'string' 
-            ? displayData.nodes.find(n => n.id === d.source)
+            ? nodesWithSimulationProps.find(n => n.id === d.source)
             : d.source
           const sourceWithProps = source as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
           return (sourceWithProps as any)?.x || 0
         })
         .attr('y1', (d: any) => {
           const source = typeof d.source === 'string' 
-            ? displayData.nodes.find(n => n.id === d.source)
+            ? nodesWithSimulationProps.find(n => n.id === d.source)
             : d.source
           const sourceWithProps = source as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
           return (sourceWithProps as any)?.y || 0
         })
         .attr('x2', (d: any) => {
           const target = typeof d.target === 'string' 
-            ? displayData.nodes.find(n => n.id === d.target)
+            ? nodesWithSimulationProps.find(n => n.id === d.target)
             : d.target
           const targetWithProps = target as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
           return (targetWithProps as any)?.x || 0
         })
         .attr('y2', (d: any) => {
           const target = typeof d.target === 'string' 
-            ? displayData.nodes.find(n => n.id === d.target)
+            ? nodesWithSimulationProps.find(n => n.id === d.target)
             : d.target
           const targetWithProps = target as (CitationNetworkNode & Partial<d3.SimulationNodeDatum>) | undefined
           return (targetWithProps as any)?.y || 0
         })
 
-      node.attr('cx', (d: any) => d.x || 0).attr('cy', (d: any) => d.y || 0)
-      labels.attr('x', (d: any) => d.x || 0).attr('y', (d: any) => d.y || 0)
+      node.attr('cx', (d: any) => {
+        const nodeWithProps = nodesWithSimulationProps.find(n => n.id === d.id)
+        return (nodeWithProps as any)?.x || 0
+      }).attr('cy', (d: any) => {
+        const nodeWithProps = nodesWithSimulationProps.find(n => n.id === d.id)
+        return (nodeWithProps as any)?.y || 0
+      })
+      // Position label groups at node center (foreignObject handles offset internally)
+      labels.attr('transform', (d: any) => {
+        const nodeWithProps = nodesWithSimulationProps.find(n => n.id === d.id)
+        const x = (nodeWithProps as any)?.x || 0
+        const y = (nodeWithProps as any)?.y || 0
+        return `translate(${x},${y})`
+      })
     }
 
     // Cleanup
@@ -600,6 +786,7 @@ export function CitationNetworkEnhanced({
       tooltip.remove()
       if (simulationRef.current) {
         simulationRef.current.stop()
+        simulationRef.current = null
       }
     }
   }, [

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useMemo } from 'react'
 import * as d3 from 'd3'
-import { ZoomIn, ZoomOut, RotateCcw, Plus, X, Loader2, FileText, Download } from 'lucide-react'
+import { ZoomIn, ZoomOut, RotateCcw, Plus, X, Loader2, FileText, Download, Copy, ExternalLink, ChevronDown, Network, Filter } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CitationNetworkResponse } from '@/types/paper-api'
 import { VeritusPaper } from '@/types/veritus'
@@ -10,6 +10,10 @@ import { GraphNode, NodeTransferPayload } from '@/types/graph-node'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { KeywordSelectionPanel } from '@/components/dashboard/KeywordSelectionPanel'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { extractKeywords } from '@/lib/utils/keyword-extractor'
 import { toast } from '@/lib/utils/toast'
 import { isDebugMode } from '@/lib/config/mock-config'
@@ -235,10 +239,12 @@ function collectKeywordsFromNodes(nodes: GraphNode[]): string[] {
 
 /**
  * Transform citation network response to hierarchical tree structure with GraphNode schema
+ * Also restores children from chatstore if available
  */
 function transformCitationNetworkToTree(
   citationNetworkResponse: CitationNetworkResponse | undefined,
-  depth: number = 0
+  depth: number = 0,
+  chatId?: string | null
 ): GraphNode | null {
   if (!citationNetworkResponse?.citationNetwork) return null
 
@@ -278,8 +284,13 @@ function transformCitationNetworkToTree(
       return node.score
     }
     
-    // Fallback to paper data score
-    const paperData = (node.data as VeritusPaper) || citationNetworkResponse.paper
+    // CRITICAL: Use only the node's own data, NO fallback
+    // This prevents fallback data from being used
+    const paperData = node.data as VeritusPaper
+    if (!paperData || !paperData.id) {
+      // No valid data for this node - return 0
+      return 0
+    }
     return paperData?.score || 0
   }
 
@@ -288,7 +299,23 @@ function transformCitationNetworkToTree(
     const node = nodeMap.get(nodeId)
     if (!node) return null
 
-    const paperData = (node.data as VeritusPaper) || citationNetworkResponse.paper
+    // CRITICAL: Use only the node's own data
+    // For root node, allow fallback to citationNetworkResponse.paper ONLY during initial build
+    // For child nodes, they MUST have their own data - NEVER use root paper as fallback
+    let paperData = node.data as VeritusPaper
+    if (!paperData && nodeId === rootNode.id) {
+      // Only root node can fallback to citationNetworkResponse.paper during initial build
+      // This is the ONLY allowed fallback, and only for the root node
+      paperData = citationNetworkResponse.paper
+    }
+    
+    // Validate that we have actual paper data for this node
+    // NO FALLBACK for child nodes - if they don't have data, return null
+    if (!paperData || !paperData.id) {
+      console.warn(`Node ${nodeId} has no valid paper data, returning null (no fallback allowed)`)
+      return null
+    }
+    
     const allChildrenIds = childrenMap.get(nodeId) || []
     
     // Limit to top 3 children by score
@@ -303,21 +330,62 @@ function transformCitationNetworkToTree(
     
     // Calculate display label based on rectangle width (120-180px)
     const maxRectWidth = 180
-    const fullLabel = node.label || paperData?.title || 'Unknown'
+    const fullLabel = node.label || paperData.title || 'Unknown'
     const displayLabel = truncateText(fullLabel, maxRectWidth)
+    
+    // CRITICAL: Only build direct children (no recursive pre-expansion)
+    // Child nodes must start EMPTY - they get children only when "Add Nodes" is used
+    const childNodes = topChildrenIds
+      .map(id => {
+        // Get child node data
+        const childNode = nodeMap.get(id)
+        if (!childNode) return null
+        
+        const childPaperData = childNode.data as VeritusPaper
+        if (!childPaperData || !childPaperData.id) {
+          console.warn(`Child node ${id} has no valid paper data`)
+          return null
+        }
+        
+        // Prevent child from having same paper as parent
+        if (childPaperData.id === paperData.id) {
+          console.warn(`Preventing circular reference: child paperId matches parent: ${childPaperData.id}`)
+          return null
+        }
+        
+        const childFullLabel = childNode.label || childPaperData.title || 'Unknown'
+        const childDisplayLabel = truncateText(childFullLabel, 180)
+        
+        // CRITICAL: Child nodes start with EMPTY children array
+        // They will only get children when user clicks "Add Nodes" on them
+        return {
+          id: childNode.id,
+          label: childFullLabel,
+          displayLabel: childDisplayLabel,
+          paper: childPaperData,
+          paperId: childPaperData.id,
+          expandable: true, // Expandable via "Add Nodes" button
+          keywords: childPaperData.fieldsOfStudy || [],
+          depth: nodeDepth + 1,
+          nodeType: childNode.nodeType || 'paper',
+          parentId: node.id,
+          children: [], // CRITICAL: Start empty - no pre-expansion
+        } as GraphNode
+      })
+      .filter((child): child is GraphNode => child !== null)
     
     return {
       id: node.id,
       label: fullLabel, // Full text
       displayLabel: displayLabel, // Truncated text
       paper: paperData,
-      paperId: paperData?.id || node.id.replace('paper-', '').replace('root-', ''),
-      expandable: true, // All nodes are expandable to fetch more children from chatstore
-      keywords: paperData?.fieldsOfStudy || [],
+      paperId: paperData.id, // Use actual paper ID
+      expandable: true, // All nodes are expandable via "Add Nodes" button
+      keywords: paperData.fieldsOfStudy || [],
       depth: nodeDepth,
       nodeType: node.nodeType || 'paper',
       parentId: node.parentId,
-      children: topChildrenIds.map(id => buildGraphNode(id, nodeDepth + 1)).filter(Boolean) as GraphNode[],
+      children: childNodes, // Only direct children, no deeper levels
     }
   }
 
@@ -359,14 +427,109 @@ export function CitationTreeVisualization({
   }>({})
   const [searchPopupOpen, setSearchPopupOpen] = useState(false)
   const [searchInProgress, setSearchInProgress] = useState(false) // Track if search is running (even if popup closed)
+  const [searchResults, setSearchResults] = useState<VeritusPaper[]>([]) // Store search results
+  const [showSearchResults, setShowSearchResults] = useState(false) // Control visibility of results panel
+  const [sortBy, setSortBy] = useState<'score' | 'year' | 'citations' | 'title' | 'keywords'>('score')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [filterYear, setFilterYear] = useState<string>('')
+  const [filterMinCitations, setFilterMinCitations] = useState<string>('')
+  const [filterMinScore, setFilterMinScore] = useState<string>('')
+  const [filterKeywords, setFilterKeywords] = useState<string[]>([]) // Keywords to filter by
+  const [availableKeywords, setAvailableKeywords] = useState<string[]>([]) // All unique keywords from results
+  const [showFilterPanel, setShowFilterPanel] = useState(false) // Toggle filter panel
 
-  // Transform citation network to tree structure
+  // Transform citation network to tree structure and restore children from chatstore
   useEffect(() => {
     if (citationNetworkResponse) {
-      const transformed = transformCitationNetworkToTree(citationNetworkResponse)
-      setTreeData(transformed)
+      // First transform the basic tree
+      let transformed = transformCitationNetworkToTree(citationNetworkResponse, 0, chatId)
+      
+      // Then restore children from chatstore if available
+      if (transformed && chatId) {
+        const restoreChildrenFromChatstore = async () => {
+          try {
+            const response = await fetch(`/api/v1/papers/store-children?chatId=${chatId}`)
+            if (response.ok) {
+              const data = await response.json()
+              const relationships = data.relationships || {}
+              
+              // CRITICAL: Restore children from chatstore, but do NOT recursively pre-expand
+              // Only restore direct children - grandchildren are restored when their parent is expanded
+              const restoreChildren = (node: GraphNode): GraphNode => {
+                if (!node.paperId) return node
+                const nodeRelationships = relationships[node.paperId as string]
+                if (nodeRelationships && nodeRelationships.childPapers) {
+                  const childPapers = nodeRelationships.childPapers.slice(0, 3) // Max 3
+                  
+                  // Create child nodes from stored relationships
+                  const restoredChildren: GraphNode[] = childPapers
+                    .map((cp: { id: string; title: string; sourceParentId: string }): GraphNode | null => {
+                      // Check if child already exists in current children
+                      const existingChild = (node.children || []).find(c => c.paperId === cp.id)
+                      if (existingChild) {
+                        // Child already exists - keep it but don't recursively restore its children
+                        // Children will be restored when user expands that node
+                        return existingChild
+                      } else {
+                        // Create new child node from stored data
+                        // CRITICAL: Start with empty children - no pre-expansion
+                        return {
+                          id: `child-${cp.id}`,
+                          label: cp.title,
+                          displayLabel: truncateText(cp.title, 180),
+                          paper: { id: cp.id, title: cp.title } as VeritusPaper, // Minimal paper data
+                          paperId: cp.id,
+                          expandable: true,
+                          keywords: [],
+                          depth: node.depth + 1,
+                          nodeType: 'paper',
+                          children: [], // CRITICAL: Start empty - no recursive pre-expansion
+                        }
+                      }
+                    })
+                    .filter((child: GraphNode | null): child is GraphNode => child !== null)
+                  
+                  // Merge with existing children (max 3 total)
+                  const existingChildIds = new Set((node.children || []).map((c: GraphNode) => c.paperId))
+                  const newChildren = restoredChildren.filter((c: GraphNode) => !existingChildIds.has(c.paperId))
+                  const allChildren = [...(node.children || []), ...newChildren].slice(0, 3)
+                  
+                  // CRITICAL: Do NOT recursively restore grandchildren
+                  // Children start empty and are restored only when their parent is expanded
+                  return {
+                    ...node,
+                    children: allChildren, // Direct children only, no recursive expansion
+                  }
+                }
+                // No stored relationships - keep node as is (but still process children if they exist)
+                return {
+                  ...node,
+                  // Keep existing children but don't recursively restore their children
+                  // Children's children will be restored when user expands them
+                  children: node.children || [],
+                }
+              }
+              
+              // CRITICAL: Only restore direct children of root, not recursively
+              // This ensures we only restore A → B, C, D initially
+              if (transformed) {
+                transformed = restoreChildren(transformed)
+                setTreeData(transformed)
+              }
+            }
+          } catch (error) {
+            console.error('Error restoring children from chatstore:', error)
+            // Don't fail if restoration fails, just use the basic tree
+            setTreeData(transformed)
+          }
+        }
+        
+        restoreChildrenFromChatstore()
+      } else {
+        setTreeData(transformed)
+      }
     }
-  }, [citationNetworkResponse])
+  }, [citationNetworkResponse, chatId])
 
   // Hydrate selected fields/keywords from citation network meta (for restored chats)
   useEffect(() => {
@@ -578,15 +741,18 @@ export function CitationTreeVisualization({
 
   // Handle search similar papers
   const handleSearchSimilarPapers = async (params: {
-    corpusId: string
-    jobType: 'keywordSearch' | 'querySearch' | 'combinedSearch'
+    corpusId?: string
+    jobType?: 'keywordSearch' | 'querySearch' | 'combinedSearch'
     keywords?: string[]
     tldrs?: string[]
     authors?: string[]
     references?: string[]
     filters?: any
   }) => {
-    if (!selectedNodeForMetadata || !chatId) return
+    if (!selectedNodeForMetadata || !chatId) {
+      toast.error('Missing required data', 'Please select a node and ensure chat ID is available')
+      return
+    }
     
     // Prevent multiple simultaneous searches
     if (searchInProgress) {
@@ -600,6 +766,10 @@ export function CitationTreeVisualization({
     setLoadingNodes(prev => new Set(prev).add(selectedNodeForMetadata.id))
     
     try {
+      // CRITICAL: Get paper ID for padding phrases if needed
+      const paperId = selectedNodeForMetadata.paperId || selectedNodeForMetadata.paper?.id
+      const corpusId = paperId?.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
+      
       // Build request body for job creation
       const body: any = {}
       if (params.keywords && params.keywords.length > 0) {
@@ -609,16 +779,39 @@ export function CitationTreeVisualization({
         body.query = params.tldrs.join(' ')
       }
       
+      // CRITICAL: Add corpusId to body for phrase padding if needed
+      if (corpusId) {
+        body.corpusId = corpusId
+      }
+      
       // Determine job type
       const hasKeywords = params.keywords && params.keywords.length > 0
       const hasTldrs = params.tldrs && params.tldrs.length > 0
       let jobType: 'keywordSearch' | 'querySearch' | 'combinedSearch' = 'querySearch'
+      
+      // CRITICAL: Validate that we have required fields before creating job
       if (hasKeywords && hasTldrs) {
         jobType = 'combinedSearch'
+        // For combinedSearch, we need both phrases and query
+        if (!body.phrases || body.phrases.length === 0) {
+          throw new Error('Keywords are required for combined search')
+        }
+        if (!body.query || body.query.trim().length === 0) {
+          throw new Error('Query (TLDRs) is required for combined search')
+        }
       } else if (hasKeywords) {
         jobType = 'keywordSearch'
+        if (!body.phrases || body.phrases.length === 0) {
+          throw new Error('Keywords are required for keyword search')
+        }
       } else if (hasTldrs) {
         jobType = 'querySearch'
+        if (!body.query || body.query.trim().length === 0) {
+          throw new Error('Query (TLDRs) is required for query search')
+        }
+      } else {
+        // No keywords or tldrs - this is invalid
+        throw new Error('Either keywords or query (TLDRs) must be provided')
       }
       
       // Build query params for filters
@@ -644,7 +837,16 @@ export function CitationTreeVisualization({
       })
       
       if (!jobResponse.ok) {
-        throw new Error('Failed to create search job')
+        // Try to get error message from response
+        let errorMessage = 'Failed to create search job'
+        try {
+          const errorData = await jobResponse.json()
+          errorMessage = errorData.error || errorMessage
+        } catch (e) {
+          // If response is not JSON, use status text
+          errorMessage = jobResponse.statusText || errorMessage
+        }
+        throw new Error(errorMessage)
       }
       
       const jobData = await jobResponse.json()
@@ -705,117 +907,89 @@ export function CitationTreeVisualization({
         }
       }
       
-      // Step 4: Auto-close popup if still open (before adding nodes)
+      // Step 4: Auto-close popup if still open
       setSearchPopupOpen(false)
       
-      if (papers.length > 0) {
-        // Step 5: Add papers as child nodes under the selected node
-        // Replace empty nodes with actual paper data, or add new nodes if no empty nodes exist
-        const addPapersToTree = (node: GraphNode | null): GraphNode | null => {
-          if (!node) return null
-          if (node.id === selectedNodeForMetadata.id) {
-            // Create new child nodes from search results
-            const newChildren = papers.slice(0, 5).map((paper, idx) => {
-              const fullLabel = paper.title || 'Unknown'
-              const displayLabel = truncateText(fullLabel, 180)
-              return {
-                id: `paper-${paper.id}-${Date.now()}-${idx}`,
-                label: fullLabel,
-                displayLabel: displayLabel,
-                paper: paper,
-                paperId: paper.id,
-                expandable: true,
-                keywords: paper.fieldsOfStudy || [],
-                depth: node.depth + 1,
-                nodeType: 'paper' as const,
-                parentId: node.id,
-                children: [],
-              } as GraphNode
-            })
-            
-            // Check if there are empty nodes to replace
-            const existingChildren = node.children || []
-            const emptyNodeIndices: number[] = []
-            existingChildren.forEach((child, idx) => {
-              // Check if this is an empty node (label is "New Node" or tracked in emptyNodes)
-              if (child.label === 'New Node' || child.displayLabel === 'New Node' || 
-                  child.id.startsWith('empty-') || emptyNodes.has(child.id)) {
-                emptyNodeIndices.push(idx)
-              }
-            })
-            
-            // Replace empty nodes with actual paper data
-            let updatedChildren = [...existingChildren]
-            const emptyNodesToRemove = new Set<string>()
-            
-            if (emptyNodeIndices.length > 0) {
-              // Replace empty nodes with paper data (one-to-one replacement)
-              emptyNodeIndices.forEach((emptyIdx, paperIdx) => {
-                if (paperIdx < newChildren.length) {
-                  const emptyNode = updatedChildren[emptyIdx]
-                  emptyNodesToRemove.add(emptyNode.id)
-                  updatedChildren[emptyIdx] = newChildren[paperIdx]
-                }
-              })
-              
-              // Add remaining papers as new children if we have more papers than empty nodes
-              if (newChildren.length > emptyNodeIndices.length) {
-                updatedChildren = [
-                  ...updatedChildren,
-                  ...newChildren.slice(emptyNodeIndices.length)
-                ]
-              }
-            } else {
-              // No empty nodes to replace, just add new children
-              updatedChildren = [...updatedChildren, ...newChildren]
-            }
-            
-            // Remove replaced empty nodes from tracking
-            if (emptyNodesToRemove.size > 0) {
-              setEmptyNodes(prev => {
-                const next = new Map(prev)
-                emptyNodesToRemove.forEach(id => next.delete(id))
-                return next
-              })
-            }
-            
-            return {
-              ...node,
-              children: updatedChildren,
-            }
-          }
-          // Recursively update children
+      // CRITICAL: Store search results in chatstore (top 3 by score) - DO NOT auto-add to tree
+      if (papers.length > 0 && selectedNodeForMetadata && selectedNodeForMetadata.paperId && chatId) {
+        // Sort by score and take top 3
+        const sortedPapers = papers
+          .map(paper => ({
+            paper,
+            score: paper.score || 0,
+          }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 3) // STRICT: Only top 3
+        
+        // Normalize paperId for storage (remove prefixes to ensure consistency)
+        // CRITICAL: Convert to string to ensure type consistency with backend
+        let normalizedParentPaperId = selectedNodeForMetadata.paperId ? String(selectedNodeForMetadata.paperId).replace('corpus:', '').replace('paper-', '').replace('root-', '').trim() : ''
+        
+        // Prepare child papers for storage - store FULL paper data for consistency
+        // CRITICAL: Normalize child IDs to ensure consistency
+        const childPapers = sortedPapers.map(({ paper }) => {
+          const normalizedChildId = paper.id ? String(paper.id).replace('corpus:', '').replace('paper-', '').replace('root-', '').trim() : paper.id
           return {
-            ...node,
-            children: node.children?.map(addPapersToTree).filter(Boolean) as GraphNode[],
+            id: normalizedChildId,
+            title: paper.title || 'Unknown',
+            sourceParentId: normalizedParentPaperId,
+            // Store full paper data for consistent datastore
+            paper: paper, // Full VeritusPaper object
           }
-        }
+        })
         
-        // Update tree data with new nodes (this triggers auto-layout)
-        setTreeData(prev => prev ? addPapersToTree(prev) : null)
-        
-        // Step 6: Update chatstore with new papers and maintain parent/child relationships
+        // Store parent→child relationships in chatstore
         try {
-          // Store papers in chatstore via the search-papers API which handles chatstore updates
-          const storeResponse = await fetch(`/api/v1/papers/search-papers?chatId=${chatId}`, {
+          if (childPapers.length === 0) {
+            toast.info('No results to store', 'No similar papers found to store.')
+            return
+          }
+          
+          const storeResponse = await fetch(`/api/v1/papers/store-children?chatId=${chatId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              _skipJobCreation: true,
-              _papers: papers,
-              chatId,
-              isMocked: true,
+              paperId: normalizedParentPaperId,
+              childPapers: childPapers,
             }),
           })
           
-          if (!storeResponse.ok) {
-            toast.warning('Failed to update chat store', 'Papers were added to graph but may not be saved')
+          if (storeResponse.ok) {
+            const storeResult = await storeResponse.json()
+            
+            if (storeResult.totalChildren === 0) {
+              toast.warning(
+                'Storage issue',
+                'Children were not stored. This might mean duplicates were filtered out or max was reached.'
+              )
+            } else {
+              // Show toast notification - NO popup/modal
+              toast.success(
+                'Search completed',
+                'Click the node to view the new similar papers.'
+              )
+            }
+          } else {
+            const errorData = await storeResponse.json().catch(() => ({ error: storeResponse.statusText }))
+            console.error('Failed to store parent→child relationship:', errorData)
+            toast.error(
+              'Storage failed',
+              errorData.error || 'Could not store children. Please try again.'
+            )
           }
-        } catch (error: any) {
-          toast.warning('Failed to update chat store', error?.message || 'Papers were added to graph but may not be saved')
-          // Don't fail the entire operation if chatstore update fails
+        } catch (error) {
+          console.error('Error storing parent→child relationship:', error)
+          toast.error(
+            'Storage error',
+            error instanceof Error ? error.message : 'An unexpected error occurred while storing children.'
+          )
         }
+      } else if (papers.length === 0) {
+        toast.info('No results found', 'No similar papers found for this node.')
       }
+      
+      // CRITICAL: Do NOT auto-add nodes to tree
+      // Nodes will be added when user clicks the node that initiated the search
       
       // Close panels after successful search
       setKeywordPanelOpen(false)
@@ -886,12 +1060,6 @@ export function CitationTreeVisualization({
       return
     }
 
-    console.log('=== Creating Chat from Node ===')
-    console.log('Node ID:', node.id)
-    console.log('Node Label:', node.label)
-    console.log('Node Paper ID:', node.paperId)
-    console.log('Node Paper Title:', node.paper?.title)
-    console.log('Current selectedNodeForMetadata ID:', selectedNodeForMetadata?.id)
 
     // Verify we're using the correct node
     if (selectedNodeForMetadata && selectedNodeForMetadata.id !== node.id) {
@@ -909,7 +1077,6 @@ export function CitationTreeVisualization({
         paperId = paperId.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
       }
 
-      console.log('Fetching paper with ID:', paperId)
 
       let fullPaper: VeritusPaper | null = null
 
@@ -919,7 +1086,6 @@ export function CitationTreeVisualization({
            node.paperId?.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim() === paperId ||
            !paperId)) {
         fullPaper = nodeMetadataFromChatstore
-        console.log('Using nodeMetadataFromChatstore:', fullPaper.title)
       } else if (paperId) {
         // Fetch real data from chatstore (respects DEBUG env, no forced mock)
         try {
@@ -928,7 +1094,6 @@ export function CitationTreeVisualization({
             const data = await response.json()
             if (data.paper) {
               fullPaper = data.paper as VeritusPaper
-              console.log('Fetched paper from API:', fullPaper.title)
               // Update nodeMetadataFromChatstore for future use
               setNodeMetadataFromChatstore(fullPaper)
             }
@@ -940,37 +1105,25 @@ export function CitationTreeVisualization({
         }
       }
 
-      // Fallback to existing node paper
-      if (!fullPaper && node.paper) {
-        fullPaper = node.paper
-        console.log('Using node.paper as fallback:', fullPaper.title)
-      }
-
+      // CRITICAL: Do NOT use node.paper as fallback - it might be stale fallback data
+      // Only use data that was explicitly fetched for this node
       if (!fullPaper) {
-        toast.warning('No paper data available', 'Please try selecting a different node')
+        toast.warning('No paper data available', 'Please try selecting a different node or use "Add Nodes" to add data.')
         return
       }
-
-      // Verify the paper ID matches what we expect
+      
+      // Validate that the fetched paper matches the node's paperId
       const fetchedPaperId = fullPaper.id?.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
       const expectedPaperId = paperId || node.paperId?.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
       
-      if (expectedPaperId && fetchedPaperId && fetchedPaperId !== expectedPaperId) {
-        toast.warning('Paper ID mismatch', 'Using different paper than expected')
-        // Still proceed, but show the warning
+      if (fetchedPaperId && expectedPaperId && fetchedPaperId !== expectedPaperId) {
+        console.warn(`Paper ID mismatch: fetched ${fetchedPaperId}, expected ${expectedPaperId}`)
+        toast.warning('Data mismatch', 'The fetched paper does not match this node. Use "Add Nodes" to add correct data.')
+        return
       }
-
-      console.log('Final paper to create chat with:', {
-        id: fullPaper.id,
-        title: fullPaper.title,
-        authors: fullPaper.authors,
-        expectedPaperId: expectedPaperId,
-        fetchedPaperId: fetchedPaperId
-      })
 
       // Transfer selected fields (max 4) for this node
       const nodeSelectedFields = selectedFields.get(node.id) || new Map<string, string>()
-      console.log('Selected fields for node:', Object.fromEntries(nodeSelectedFields))
 
     // Build metadata payload for transfer
     const metadataFields = getMetadataFields(fullPaper)
@@ -1052,9 +1205,48 @@ export function CitationTreeVisualization({
     }
   }, [width, height])
 
-  // Expand node with related papers
+  // DEPRECATED: This function should NOT be called from node clicks
+  // Only "Add Nodes" (handleSearchSimilarPapers) should add new children
+  // Keeping for backward compatibility but marking as deprecated
   const expandNode = async (nodeId: string, paperId: string) => {
     if (!chatId || loadingNodes.has(nodeId)) return
+
+    // CRITICAL: Validate that the node has valid data before expanding
+    // Find the node in treeData to verify it has valid paper data
+    // Also validate that paper.id matches paperId to catch stale fallback data
+    const findNode = (node: GraphNode | null, targetId: string): GraphNode | null => {
+      if (!node) return null
+      if (node.id === targetId) return node
+      if (node.children) {
+        for (const child of node.children) {
+          const found = findNode(child, targetId)
+          if (found) return found
+        }
+      }
+      return null
+    }
+    
+    const targetNode = findNode(treeData, nodeId)
+    
+    // CRITICAL: Validate paper data exists AND matches paperId (prevents stale fallback data)
+    const hasValidData = targetNode && 
+                        targetNode.paper && 
+                        targetNode.paper.id && 
+                        targetNode.paperId &&
+                        targetNode.paper.id === targetNode.paperId
+    
+    if (!hasValidData) {
+      console.warn(`Cannot expand node ${nodeId}: node has no valid paper data or data mismatch (stale fallback)`)
+      toast.warning('Cannot expand node', 'This node has no valid data. Use "Add Nodes" to add data first.')
+      return
+    }
+
+    // CRITICAL: Check if node already has 3 children - if so, don't fetch more
+    const currentChildCount = (targetNode.children || []).length
+    if (currentChildCount >= 3) {
+      toast.info('Maximum children reached', 'This node already has 3 children. Use "Add More Nodes" to add additional papers.')
+      return
+    }
 
     setLoadingNodes(prev => new Set(prev).add(nodeId))
     try {
@@ -1071,13 +1263,16 @@ export function CitationTreeVisualization({
         const data: CitationNetworkResponse = await response.json()
         if (data.citationNetwork?.nodes) {
           // Helper to get score from node
+          // CRITICAL: Use only the node's own data, NEVER fallback to parent or other nodes
           const getScore = (n: any): number => {
             if (n.score !== null && n.score !== undefined) return n.score
-            const paperData = (n.data as VeritusPaper) || data.paper
+            const paperData = n.data as VeritusPaper
+            // Only use this node's paper data, not parent's
             return paperData?.score || 0
           }
           
           // Find the node in tree data and add children (limited to top 3 by score)
+          // These children come from a search on THIS parent node
           const addChildrenToNode = (node: GraphNode | null): GraphNode | null => {
             if (!node) return null
             if (node.id === nodeId) {
@@ -1089,30 +1284,109 @@ export function CitationTreeVisualization({
                 }))
                 .sort((a, b) => b.score - a.score) // Sort by score descending
                 .slice(0, 3) // Take only top 3
-                .map(({ node: n }) => {
-                  const paperData = (n.data as VeritusPaper) || data.paper
-                  const fullLabel = n.label || paperData?.title || 'Unknown'
+                .map(({ node: n }): GraphNode | null => {
+                  // CRITICAL: Use only the node's own data, NEVER fallback to parent paper
+                  // This prevents the same data from traversing across all nodes
+                  const paperData = n.data as VeritusPaper
+                  
+                  // Validate that we have actual paper data for this node
+                  // NO FALLBACK - if no data, skip this child
+                  if (!paperData || !paperData.id) {
+                    console.warn(`Node ${n.id} has no valid paper data, skipping (no fallback)`)
+                    return null
+                  }
+                  
+                  // Ensure unique paper ID - use the paper's actual ID, not the node ID
+                  const uniquePaperId = paperData.id
+                  
+                  // Check if this paper is already a child (prevent duplicates)
+                  const existingChildIds = (node.children || []).map(c => c.paperId).filter(Boolean)
+                  if (existingChildIds.includes(uniquePaperId)) {
+                    console.warn(`Paper ${uniquePaperId} already exists as child, skipping duplicate`)
+                    return null
+                  }
+                  
+                  // Prevent child from having same paper as parent
+                  if (uniquePaperId === node.paperId) {
+                    console.warn(`Preventing circular reference: child paperId matches parent: ${uniquePaperId}`)
+                    return null
+                  }
+                  
+                  const fullLabel = n.label || paperData.title || 'Unknown'
                   const displayLabel = truncateText(fullLabel, 180)
+                  
                   return {
                     id: n.id,
                     label: fullLabel,
                     displayLabel: displayLabel,
-                    paper: paperData,
-                    paperId: paperData?.id || n.id.replace('paper-', '').replace('root-', ''),
+                    paper: paperData, // Use only this node's paper data - NO FALLBACK
+                    paperId: uniquePaperId, // Use actual paper ID
                     expandable: true, // All nodes are expandable to fetch more children
-                    keywords: paperData?.fieldsOfStudy || [],
+                    keywords: paperData.fieldsOfStudy || [],
                     depth: node.depth + 1,
                     nodeType: n.nodeType || 'paper',
-                    children: [],
+                    children: [], // Start with empty children - they will be populated when clicked
                   }
                 })
-              // Only add children if node doesn't have any yet
-              // Each expansion fetches top 3 children from chatstore
+                .filter((child): child is GraphNode => child !== null) // Remove null entries with type guard
+              
+              // CRITICAL: Prevent duplicate children by checking existing paper IDs
+              const existingPaperIds = new Set((node.children || []).map(c => c.paperId).filter(Boolean))
+              const uniqueNewChildren = allNewChildren.filter((child) => {
+                // Skip if this paper already exists as a child
+                if (existingPaperIds.has(child.paperId)) {
+                  console.warn(`Skipping duplicate child with paperId: ${child.paperId}`)
+                  return false
+                }
+                // Skip if this is the same as the parent node
+                if (child.paperId === node.paperId) {
+                  console.warn(`Skipping child that matches parent paperId: ${child.paperId}`)
+                  return false
+                }
+                existingPaperIds.add(child.paperId) // Track added IDs
+                return true
+              })
+              
+              // CRITICAL: Enforce maximum of 3 children
+              // Calculate how many children we can add (max 3 total)
+              const currentCount = (node.children || []).length
+              const maxToAdd = Math.max(0, 3 - currentCount)
+              const childrenToAdd = uniqueNewChildren.slice(0, maxToAdd)
+              
+              // Store parent→child relationships in chatstore (async, don't await)
+              if (childrenToAdd.length > 0 && chatId) {
+                const childPapers = childrenToAdd.map(child => ({
+                  id: child.paperId,
+                  title: child.label || child.paper?.title || 'Unknown',
+                  sourceParentId: node.paperId, // Parent paper ID
+                }))
+                
+                // Store parent→child relationship in chatstore (fire and forget)
+                fetch(`/api/v1/papers/store-children?chatId=${chatId}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    paperId: node.paperId,
+                    childPapers: childPapers,
+                  }),
+                })
+                  .then(response => {
+                    if (!response.ok) {
+                      console.warn('Failed to store parent→child relationship in chatstore')
+                    } else {
+                    }
+                  })
+                  .catch(error => {
+                    console.error('Error storing parent→child relationship:', error)
+                    // Don't fail the operation if chatstore update fails
+                  })
+              }
+              
               return {
                 ...node,
                 children: node.children && node.children.length > 0 
-                  ? node.children // Keep existing children if they exist
-                  : allNewChildren, // Add new children only if none exist
+                  ? [...node.children, ...childrenToAdd] // Append new unique children (max 3 total)
+                  : childrenToAdd, // Add new children only if none exist
                 expandable: true, // Keep expandable so child nodes can also be expanded
               }
             }
@@ -1128,6 +1402,7 @@ export function CitationTreeVisualization({
       }
     } catch (error) {
       console.error('Error expanding node:', error)
+      toast.error('Failed to expand node', 'Could not fetch children for this node.')
     } finally {
       setLoadingNodes(prev => {
         const next = new Set(prev)
@@ -1207,9 +1482,23 @@ export function CitationTreeVisualization({
         }
       })
 
-    // Collapse all nodes initially except root
+    // Collapse all nodes initially except root and nodes in expandedNodes
     root.children?.forEach((child: any) => {
-      collapse(child)
+      const nodeData = child.data as GraphNode
+      // Only collapse if node is not in expandedNodes
+      if (!expandedNodes.has(nodeData.id)) {
+        collapse(child)
+      } else {
+        // Node should be expanded - recursively expand its children if they're in expandedNodes
+        if (child.children) {
+          child.children.forEach((grandchild: any) => {
+            const grandchildData = grandchild.data as GraphNode
+            if (!expandedNodes.has(grandchildData.id)) {
+              collapse(grandchild)
+            }
+          })
+        }
+      }
     })
 
     let i = 0
@@ -1494,20 +1783,192 @@ export function CitationTreeVisualization({
           event.stopPropagation()
           const nodeData = d.data as GraphNode
           
-          // If node has children, toggle collapse/expand
+          // CRITICAL: Click behavior - expand/collapse existing children OR fetch stored children from chatstore
           if (d.children && d.children.length > 0) {
+            // Node has children - collapse them
             d._children = d.children
             d.children = undefined
             update(d)
+            setExpandedNodes(prev => {
+              const next = new Set(prev)
+              next.delete(nodeData.id)
+              return next
+            })
           } else if (d._children && d._children.length > 0) {
-            // Restore collapsed children
+            // Node has collapsed children - restore them
             d.children = d._children
             d._children = undefined
             update(d)
-          } else if (nodeData.paperId && chatId && !loadingNodes.has(nodeData.id)) {
-            // Node has no children yet - fetch top 3 from chatstore
-            await expandNode(nodeData.id, nodeData.paperId)
-            // After expansion, update will be triggered by setTreeData
+            setExpandedNodes(prev => new Set(prev).add(nodeData.id))
+          } else {
+            // Node has no visible children - check if there are stored children in chatstore
+            // This happens after a search job completes - fetch stored children and add them
+            if (!nodeData.paperId) {
+              console.warn('Node has no paperId, cannot fetch children')
+              toast.info(
+                'No child nodes',
+                'This node has no paper ID. Use "Add Nodes" to explore similar papers.'
+              )
+              return
+            }
+            
+            if (!chatId) {
+              console.warn('No chatId available, cannot fetch children')
+              toast.info(
+                'No child nodes',
+                'Chat ID is missing. Cannot fetch children.'
+              )
+              return
+            }
+            
+            // Clear loading state if it's stuck (safety check)
+            if (loadingNodes.has(nodeData.id)) {
+              setLoadingNodes(prev => {
+                const next = new Set(prev)
+                next.delete(nodeData.id)
+                return next
+              })
+              // Small delay to ensure state clears, then continue
+              setTimeout(() => {
+                // Will retry below after function is defined
+              }, 100)
+            }
+            
+            // Function to fetch children (extracted for retry logic)
+            const fetchChildren = () => {
+              setLoadingNodes(prev => new Set(prev).add(nodeData.id))
+              
+              // Normalize paperId (remove prefixes) to match storage format
+              // CRITICAL: Convert to string to ensure type consistency with backend
+              let normalizedPaperId = nodeData.paperId ? String(nodeData.paperId).replace('corpus:', '').replace('paper-', '').replace('root-', '').trim() : ''
+              
+              // Fetch stored children from chatstore API
+              const apiUrl = `/api/v1/papers/store-children?chatId=${encodeURIComponent(chatId)}&paperId=${encodeURIComponent(normalizedPaperId)}`
+              
+              fetch(apiUrl)
+                .then(response => {
+                  if (response.ok) {
+                    return response.json()
+                  }
+                  // Try to get error message from response
+                  return response.json().then(errorData => {
+                    throw new Error(errorData.error || `Failed to fetch stored children: ${response.statusText}`)
+                  }).catch(() => {
+                    throw new Error(`Failed to fetch stored children: ${response.statusText}`)
+                  })
+                })
+                .then(data => {
+                  const storedChildren = data.childPapers || []
+                  
+                  if (storedChildren && storedChildren.length > 0) {
+                    // Mark node as expanded FIRST so D3 will show children when tree re-renders
+                    setExpandedNodes(prev => new Set(prev).add(nodeData.id))
+                    
+                    // Use setTreeData callback to access current state (avoids shadowing issues)
+                    setTreeData((currentTreeState: GraphNode | null) => {
+                      if (!currentTreeState) {
+                        console.warn('No current tree state to update')
+                        return null
+                      }
+                      
+                      // Add stored children to the node
+                      const addStoredChildrenToNode = (node: GraphNode | null): GraphNode | null => {
+                        if (!node) return null
+                        if (node.id === nodeData.id) {
+                          // Check existing children to prevent duplicates
+                          const existingPaperIds = new Set((node.children || []).map(c => c.paperId).filter(Boolean))
+                          
+                          // Create child nodes from stored data - use full paper data if available
+                          const newChildren = storedChildren
+                            .filter((cp: any) => !existingPaperIds.has(cp.id) && cp.id !== node.paperId)
+                            .slice(0, 3 - (node.children || []).length) // Max 3 total
+                            .map((cp: any) => {
+                              // Use full paper data from chatstore if available, otherwise create minimal paper
+                              const fullPaper: VeritusPaper = cp.paper || {
+                                id: cp.id,
+                                title: cp.title || 'Unknown',
+                                abstract: null,
+                                authors: '',
+                                doi: null,
+                                downloadable: false,
+                                fieldsOfStudy: [],
+                                impactFactor: {
+                                  citationCount: 0,
+                                  influentialCitationCount: 0,
+                                  referenceCount: 0,
+                                },
+                                journalName: null,
+                                publicationType: null,
+                                publishedAt: null,
+                                tldr: null,
+                                year: null,
+                              }
+                              
+                              return {
+                                id: `child-${cp.id}-${Date.now()}`,
+                                label: fullPaper.title || cp.title || 'Unknown',
+                                displayLabel: truncateText(fullPaper.title || cp.title || 'Unknown', 180),
+                                paper: fullPaper, // Use full paper data from chatstore
+                                paperId: cp.id,
+                                expandable: true,
+                                keywords: fullPaper.fieldsOfStudy || [],
+                                depth: node.depth + 1,
+                                nodeType: 'paper' as const,
+                                parentId: node.id,
+                                children: [], // Start empty
+                              } as GraphNode
+                            })
+                          
+                          return {
+                            ...node,
+                            children: [...(node.children || []), ...newChildren].slice(0, 3),
+                          }
+                        }
+                        return {
+                          ...node,
+                          children: node.children?.map((child: GraphNode) => addStoredChildrenToNode(child)).filter(Boolean) as GraphNode[],
+                        }
+                      }
+                      
+                      const updatedTree = addStoredChildrenToNode(currentTreeState)
+                      // The useEffect will automatically re-render the D3 tree with expanded node
+                      return updatedTree
+                    })
+                  } else {
+                    // No stored children - show message
+                    toast.info(
+                      'No child nodes',
+                      'This node has no children yet. Use "Add Nodes" to explore similar papers.'
+                    )
+                  }
+                })
+                .catch(error => {
+                  console.error('Error fetching stored children:', error)
+                  console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    nodeId: nodeData.id,
+                    paperId: nodeData.paperId,
+                    normalizedPaperId: normalizedPaperId,
+                    chatId: chatId
+                  })
+                  toast.error(
+                    'Failed to fetch children',
+                    error.message || 'Could not retrieve child nodes. Please try again.'
+                  )
+                })
+                .finally(() => {
+                  // Always clear loading state, even on error
+                  setLoadingNodes(prev => {
+                    const next = new Set(prev)
+                    next.delete(nodeData.id)
+                    return next
+                  })
+                })
+            }
+            
+            // Start the fetch
+            fetchChildren()
           }
         })
 
@@ -1536,16 +1997,20 @@ export function CitationTreeVisualization({
         .style('pointer-events', 'none') // Prevent text from blocking clicks
         .text((d: any) => {
           const nodeData = d.data as GraphNode
-          return nodeData.label || nodeData.displayLabel || 'Unknown'
+          const fullTitle = nodeData.label || nodeData.displayLabel || 'Unknown'
+          // Truncate to max 30 characters with ellipsis
+          if (fullTitle.length > 30) {
+            return fullTitle.substring(0, 30) + '...'
+          }
+          return fullTitle
         })
         .each(function(d: any) {
-          // Add title tooltip
+          // Add title tooltip to show full title on hover
+          const nodeData = d.data as GraphNode
+          const fullTitle = nodeData.label || nodeData.displayLabel || 'Unknown'
           d3.select(this)
             .append('title')
-            .text(() => {
-              const nodeData = d.data as GraphNode
-              return nodeData.label || 'Unknown'
-            })
+            .text(fullTitle) // Show full title in tooltip
         })
         .on('click', (event, d: any) => {
           event.stopPropagation()
@@ -1588,14 +2053,6 @@ export function CitationTreeVisualization({
             // Still proceed, but log the error
           }
           
-          console.log('=== Plus Button Clicked ===')
-          console.log('Node ID from click:', nodeData.id)
-          console.log('Node Label:', nodeData.label)
-          console.log('Node Paper ID:', nodeData.paperId)
-          console.log('Node Paper Title:', nodeData.paper?.title)
-          console.log('D3 node depth:', d.depth)
-          console.log('Parent node ID:', d.parent?.data?.id || 'root')
-          console.log('Data-node-id attribute:', dataNodeId)
           
           // Create a fresh copy of the node data to avoid reference issues
           const nodeCopy: GraphNode = {
@@ -1618,7 +2075,6 @@ export function CitationTreeVisualization({
               paperId = paperId.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
             }
             
-            console.log('Fetching paper metadata for paperId:', paperId)
             
             if (paperId && chatId) {
               // Fetch real data from chatstore (respects DEBUG env, no forced mock)
@@ -1626,27 +2082,41 @@ export function CitationTreeVisualization({
               if (response.ok) {
                 const data = await response.json()
                 if (data.paper) {
-                  console.log('Fetched paper metadata:', data.paper.title)
-                  setNodeMetadataFromChatstore(data.paper)
+                  // Validate that fetched paper matches the node's paperId
+                  const fetchedId = data.paper.id?.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
+                  const expectedId = paperId || nodeCopy.paperId?.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
+                  
+                  if (fetchedId && expectedId && fetchedId === expectedId) {
+                    setNodeMetadataFromChatstore(data.paper)
+                  } else {
+                    console.warn(`Paper ID mismatch: fetched ${fetchedId}, expected ${expectedId}`)
+                    // Do NOT use fallback - node has invalid/stale data
+                    setNodeMetadataFromChatstore(null)
+                  }
                 } else {
-                  // Fallback to existing paper data if fetch fails
-                  console.log('No paper in response, using node.paper')
-                  setNodeMetadataFromChatstore(nodeCopy.paper || null)
+                  // CRITICAL: Do NOT use fallback - node might have stale data
+                  console.warn('No paper in response, node has no valid data')
+                  setNodeMetadataFromChatstore(null)
                 }
               } else {
-                // Fallback to existing paper data if fetch fails
-                console.log('Fetch failed, using node.paper')
-                setNodeMetadataFromChatstore(nodeCopy.paper || null)
+                // CRITICAL: Do NOT use fallback - node might have stale data
+                console.warn('Fetch failed, node has no valid data')
+                setNodeMetadataFromChatstore(null)
               }
             } else {
-              // Use existing paper data if no paperId or chatId
-              console.log('No paperId or chatId, using node.paper')
-              setNodeMetadataFromChatstore(nodeCopy.paper || null)
+              // CRITICAL: Do NOT use fallback - validate node has valid data first
+              if (nodeCopy.paper && nodeCopy.paperId && nodeCopy.paper.id === nodeCopy.paperId) {
+                // Only use node.paper if it's validated (matches paperId)
+                setNodeMetadataFromChatstore(nodeCopy.paper)
+              } else {
+                console.warn('No paperId or chatId, and node has no valid data')
+                setNodeMetadataFromChatstore(null)
+              }
             }
           } catch (error) {
             console.error('Error fetching paper metadata from chatstore:', error)
-            // Fallback to existing paper data
-            setNodeMetadataFromChatstore(nodeCopy.paper || null)
+            // CRITICAL: Do NOT use fallback - node might have stale data
+            setNodeMetadataFromChatstore(null)
           } finally {
             setLoadingMetadata(false)
           }
@@ -1727,9 +2197,25 @@ export function CitationTreeVisualization({
         .attr('dy', '0.35em')
         .text((d: any) => {
           const nodeData = d.data as GraphNode
-          return nodeData.label || nodeData.displayLabel || 'Unknown'
+          const fullTitle = nodeData.label || nodeData.displayLabel || 'Unknown'
+          // Truncate to max 30 characters with ellipsis
+          if (fullTitle.length > 30) {
+            return fullTitle.substring(0, 30) + '...'
+          }
+          return fullTitle
         })
         .attr('font-weight', (d: any) => d.depth === 0 ? 'bold' : 'normal')
+        .each(function(d: any) {
+          // Update tooltip with full title on hover
+          const nodeData = d.data as GraphNode
+          const fullTitle = nodeData.label || nodeData.displayLabel || 'Unknown'
+          const titleElement = d3.select(this).select('title')
+          if (titleElement.empty()) {
+            d3.select(this).append('title').text(fullTitle)
+          } else {
+            titleElement.text(fullTitle)
+          }
+        })
 
       // Update plus buttons visibility and ensure click handlers are bound correctly
       const plusButtonsUpdate = nodeUpdate
@@ -1763,14 +2249,6 @@ export function CitationTreeVisualization({
           // Still proceed, but log the error
         }
         
-        console.log('=== Plus Button Clicked (Update) ===')
-        console.log('Node ID from click:', nodeData.id)
-        console.log('Node Label:', nodeData.label)
-        console.log('Node Paper ID:', nodeData.paperId)
-        console.log('Node Paper Title:', nodeData.paper?.title)
-        console.log('D3 node depth:', d.depth)
-        console.log('Parent node ID:', d.parent?.data?.id || 'root')
-        console.log('Data-node-id attribute:', dataNodeId)
         
         // Create a fresh copy of the node data to avoid reference issues
         const nodeCopy: GraphNode = {
@@ -1791,28 +2269,47 @@ export function CitationTreeVisualization({
             paperId = paperId.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
           }
           
-          console.log('Fetching paper metadata for paperId:', paperId)
-          
           if (paperId && chatId) {
             // Fetch real data from chatstore (respects DEBUG env, no forced mock)
             const response = await fetch(`/api/v1/papers/${paperId}?chatId=${chatId}`)
-            if (response.ok) {
-              const data = await response.json()
-              if (data.paper) {
-                console.log('Fetched paper metadata:', data.paper.title)
-                setNodeMetadataFromChatstore(data.paper)
+              if (response.ok) {
+                const data = await response.json()
+                if (data.paper) {
+                  // Validate that fetched paper matches the node's paperId
+                  const fetchedId = data.paper.id?.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
+                  const expectedId = paperId || nodeCopy.paperId?.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
+                  
+                  if (fetchedId && expectedId && fetchedId === expectedId) {
+                    setNodeMetadataFromChatstore(data.paper)
+                  } else {
+                    console.warn(`Paper ID mismatch: fetched ${fetchedId}, expected ${expectedId}`)
+                    // Do NOT use fallback - node has invalid/stale data
+                    setNodeMetadataFromChatstore(null)
+                  }
+                } else {
+                  // CRITICAL: Do NOT use fallback - node might have stale data
+                  console.warn('No paper in response, node has no valid data')
+                  setNodeMetadataFromChatstore(null)
+                }
               } else {
-                setNodeMetadataFromChatstore(nodeCopy.paper || null)
+                // CRITICAL: Do NOT use fallback - node might have stale data
+                console.warn('Fetch failed, node has no valid data')
+                setNodeMetadataFromChatstore(null)
               }
             } else {
-              setNodeMetadataFromChatstore(nodeCopy.paper || null)
+              // CRITICAL: Do NOT use fallback - validate node has valid data first
+              if (nodeCopy.paper && nodeCopy.paperId && nodeCopy.paper.id === nodeCopy.paperId) {
+                // Only use node.paper if it's validated (matches paperId)
+                setNodeMetadataFromChatstore(nodeCopy.paper)
+              } else {
+                console.warn('No paperId or chatId, and node has no valid data')
+                setNodeMetadataFromChatstore(null)
+              }
             }
-          } else {
-            setNodeMetadataFromChatstore(nodeCopy.paper || null)
-          }
-        } catch (error) {
-          console.error('Error fetching paper metadata from chatstore:', error)
-          setNodeMetadataFromChatstore(nodeCopy.paper || null)
+          } catch (error) {
+            console.error('Error fetching paper metadata from chatstore:', error)
+            // CRITICAL: Do NOT use fallback - node might have stale data
+            setNodeMetadataFromChatstore(null)
         } finally {
           setLoadingMetadata(false)
         }
@@ -2683,11 +3180,53 @@ export function CitationTreeVisualization({
         }
       }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-[#0f0f0f] border-[#2a2a2a]">
-          <DialogHeader>
+        <DialogHeader>
+            {/* Display paper title above the dialog title */}
+            {(() => {
+              const paper = nodeMetadataFromChatstore || selectedNodeForMetadata?.paper
+              const paperTitle = paper?.title 
+              const titleLink = paper?.titleLink
+              return paperTitle ? (
+                <div className="mb-3 pb-3 border-b border-[#2a2a2a]">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xl text-white font-bold leading-relaxed flex-1">{paperTitle}</p>
+                    <div className="flex items-center gap-2">
+                      {/* Copy paper title button */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(paperTitle)
+                          toast.success('Paper title copied to clipboard')
+                        }}
+                        className="h-8 w-8 p-0 text-gray-400 hover:text-white hover:bg-[#2a2a2a]"
+                        title="Copy paper title"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      {/* Open title link button */}
+                      {titleLink && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            window.open(titleLink, '_blank', 'noopener,noreferrer')
+                          }}
+                          className="h-8 w-8 p-0 text-gray-400 hover:text-white hover:bg-[#2a2a2a]"
+                          title="Open paper link"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : null
+            })()}
             <DialogTitle className="text-white">Add Nodes to Citation Network</DialogTitle>
-            <DialogDescription>
+            {/* <DialogDescription>
               {selectedNodeForMetadata?.label || 'Add new nodes or search for similar papers'}
-            </DialogDescription>
+            </DialogDescription> */}
           </DialogHeader>
           
           {selectedNodeForMetadata && (() => {
@@ -2717,12 +3256,6 @@ export function CitationTreeVisualization({
                 // Still proceed with currentNode to ensure we use the latest selection
               }
               
-              console.log('=== Create Chat Button Clicked ===')
-              console.log('Dialog Node ID:', nodeId)
-              console.log('Selected Node ID:', currentNode.id)
-              console.log('Selected Node Label:', currentNode.label)
-              console.log('Selected Node Paper ID:', currentNode.paperId)
-              console.log('Selected Node Paper Title:', currentNode.paper?.title || currentNode.label)
               
               // Use the current selectedNodeForMetadata to ensure we have the latest data
               await handleCreateChatFromNode(currentNode)
@@ -2941,6 +3474,9 @@ export function CitationTreeVisualization({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* REMOVED: Search Results Panel Dialog - replaced with toast notification */}
+      {/* Search results are now stored in chatstore and retrieved when user clicks the node */}
     </div>
   )
 }

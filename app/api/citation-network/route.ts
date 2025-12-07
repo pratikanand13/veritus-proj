@@ -5,7 +5,7 @@ import Chat from '@/models/Chat'
 import mongoose from 'mongoose'
 import { VeritusPaper } from '@/types/veritus'
 import { buildCitationGraphFromPapers } from '@/lib/utils/citation-graph-builder'
-import { CitationNetworkResponse, GraphOptions } from '@/types/paper-api'
+import { CitationNetworkResponse, GraphOptions, CitationNetwork } from '@/types/paper-api'
 
 /**
  * POST /api/citation-network
@@ -152,7 +152,33 @@ export async function POST(request: Request) {
     // Convert map to array
     const papers = Array.from(papersMap.values())
 
-    if (papers.length === 0) {
+    // CRITICAL: Restore parent→child relationships from chatstore
+    // This ensures children are restored when reloading the graph
+    const paperRelationships = (chat.chatMetadata?.paperRelationships as any) || {}
+    if (Object.keys(paperRelationships).length > 0) {
+      // For each parent paper, add its children to the papers array if they don't exist
+      Object.entries(paperRelationships).forEach(([parentPaperId, relationship]: [string, any]) => {
+        const childPapers = (relationship as any).childPapers || []
+        childPapers.forEach((childPaper: any) => {
+          // Check if child paper already exists in papersMap
+          if (childPaper.id && !papersMap.has(childPaper.id)) {
+            // Create a minimal paper object from stored child data
+            // Note: Full paper data should be fetched separately if needed
+            const childPaperData: VeritusPaper = {
+              id: childPaper.id,
+              title: childPaper.title,
+              // Add other fields as needed or fetch full data separately
+            } as VeritusPaper
+            papersMap.set(childPaper.id, childPaperData)
+          }
+        })
+      })
+    }
+
+    // Convert map to array again (now includes restored children)
+    const allPapers = Array.from(papersMap.values())
+
+    if (allPapers.length === 0) {
       return NextResponse.json(
         { error: 'No papers found in chat messages' },
         { status: 404 }
@@ -164,7 +190,7 @@ export async function POST(request: Request) {
     let rootPaperId: string | undefined
     if (paperId) {
       // Check if paperId exists in the papers array
-      const paperExists = papers.some((p) => p.id === paperId)
+      const paperExists = allPapers.some((p) => p.id === paperId)
       if (paperExists) {
         rootPaperId = paperId
       } else {
@@ -178,7 +204,7 @@ export async function POST(request: Request) {
     }
 
     // Create set of expandable paper IDs (all papers in chat messages can be expanded)
-    const expandablePaperIds = new Set<string>(papers.map((p) => p.id))
+    const expandablePaperIds = new Set<string>(allPapers.map((p) => p.id))
 
     // Build graph options
     const graphOptions: GraphOptions = {
@@ -198,9 +224,57 @@ export async function POST(request: Request) {
     }
 
     // Build citation network graph using simple graph builder (paper-only structure)
-    let citationNetwork
+    // Include restored parent→child relationships from chatstore
+    let citationNetwork: CitationNetwork | undefined
     try {
-      citationNetwork = buildCitationGraphFromPapers(papers, graphOptions)
+      citationNetwork = buildCitationGraphFromPapers(allPapers, graphOptions)
+      
+      // CRITICAL: Restore parent→child edges from chatstore relationships
+      if (citationNetwork && citationNetwork.nodes && Object.keys(paperRelationships).length > 0) {
+        // Store reference to avoid undefined issues in nested callbacks
+        const network = citationNetwork
+        
+        // Build a map of paperId to node for quick lookup
+        const nodeMap = new Map<string, any>()
+        network.nodes.forEach((node: any) => {
+          if (node.data && node.data.id) {
+            nodeMap.set(node.data.id, node)
+          }
+        })
+
+        // Ensure edges array exists
+        if (!network.edges) {
+          network.edges = []
+        }
+
+        // Restore edges from stored relationships
+        Object.entries(paperRelationships).forEach(([parentPaperId, relationship]: [string, any]) => {
+          const parentNode = nodeMap.get(parentPaperId)
+          if (!parentNode) return
+
+          const childPapers = (relationship as any).childPapers || []
+          childPapers.forEach((childPaper: any) => {
+            const childNode = nodeMap.get(childPaper.id)
+            if (childNode && network.edges) {
+              // Check if edge already exists
+              const edgeExists = network.edges.some((edge: any) => {
+                const sourceId = typeof edge.source === 'string' ? edge.source : (edge.source as any)?.id
+                const targetId = typeof edge.target === 'string' ? edge.target : (edge.target as any)?.id
+                return sourceId === parentNode.id && targetId === childNode.id
+              })
+
+              if (!edgeExists) {
+                network.edges.push({
+                  source: String(parentNode.id),
+                  target: String(childNode.id),
+                  type: 'references' as const,
+                  weight: 1.0,
+                })
+              }
+            }
+          })
+        })
+      }
     } catch (buildError: any) {
       console.error('Error building citation graph:', buildError)
       throw new Error(`Failed to build citation network: ${buildError.message || 'Unknown error'}`)
@@ -212,7 +286,7 @@ export async function POST(request: Request) {
 
     // Get root paper
     const rootNode = citationNetwork.nodes.find((n) => n.isRoot)
-    const rootPaper = rootNode?.data || papers.find((p) => p.id === rootPaperId) || papers[0]
+    const rootPaper = rootNode?.data || allPapers.find((p) => p.id === rootPaperId) || allPapers[0]
 
     if (!rootPaper) {
       throw new Error('No root paper found')

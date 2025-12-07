@@ -135,12 +135,171 @@ export function CitationNetwork({ papers, citationNetworkResponse, width = 800, 
 
     svg.call(zoom)
 
-    // Create force simulation
+    // Helper function to wrap text and calculate dimensions
+    const wrapText = (text: string, maxWidth: number): { wrappedLines: string[], width: number, height: number } => {
+      const words = text.split(/\s+/).filter(word => word.length > 0)
+      const fontSize = 10
+      const lineHeight = fontSize * 1.2
+      const avgCharWidth = 6 // Average character width for 10px font
+      
+      if (words.length === 0) {
+        return { wrappedLines: [''], width: 0, height: lineHeight }
+      }
+      
+      const lines: string[] = []
+      let currentLine = words[0]
+      
+      for (let i = 1; i < words.length; i++) {
+        const word = words[i]
+        const testLine = currentLine + ' ' + word
+        const testWidth = testLine.length * avgCharWidth
+        
+        if (testWidth > maxWidth && currentLine.length > 0) {
+          lines.push(currentLine)
+          currentLine = word
+        } else {
+          currentLine = testLine
+        }
+      }
+      lines.push(currentLine)
+      
+      // Calculate actual width (longest line)
+      const maxLineWidth = Math.max(...lines.map(line => line.length * avgCharWidth))
+      const totalHeight = lines.length * lineHeight
+      
+      return {
+        wrappedLines: lines,
+        width: Math.min(maxLineWidth, maxWidth),
+        height: totalHeight
+      }
+    }
+    
+    // Calculate dynamic collision radius that accounts for node and wrapped label
+    const getCollisionRadius = (node: CitationNetworkNode) => {
+      const citations = node.paper?.impactFactor?.citationCount || 0
+      const nodeRadius = Math.max(8, Math.min(20, 8 + citations / 10))
+      const label = node.paper?.title || 'Unknown'
+      
+      // Wrap text to calculate actual label dimensions
+      const maxLabelWidth = 120 // Fixed max width for wrapping
+      const labelOffset = 15 // dx offset from node center
+      const labelPadding = 20
+      
+      const { width: labelWidth, height: labelHeight } = wrapText(label, maxLabelWidth)
+      
+      // Calculate full bounding box
+      const totalWidth = nodeRadius + labelOffset + labelWidth + labelPadding
+      const totalHeight = Math.max(nodeRadius * 2, labelHeight + labelPadding)
+      const maxDimension = Math.max(totalWidth, totalHeight)
+      
+      // Scale based on number of nodes
+      const nodeCount = network.nodes.length
+      const densityFactor = Math.max(1, Math.sqrt(nodeCount / 10))
+      const minSpacing = 50 * densityFactor
+      
+      return Math.max(maxDimension / 2, nodeRadius + minSpacing)
+    }
+    
+    // Calculate dynamic spacing parameters
+    const nodeCount = network.nodes.length
+    const edgeCount = network.edges.length
+    const graphDensity = edgeCount / Math.max(nodeCount, 1)
+    const baseChargeStrength = -800
+    const chargeMultiplier = Math.max(1, Math.sqrt(nodeCount / 5))
+    const linkDistanceBase = 150
+    const linkDistanceMultiplier = Math.max(1, Math.sqrt(nodeCount / 8))
+    
+    // Create optimized force simulation with fixes to prevent overlaps
+    // CRITICAL FIXES: Lower link strength, slow alpha decay, strong collision, separation force
     const simulation = d3.forceSimulation<CitationNetworkNode>(network.nodes)
-      .force('link', d3.forceLink<CitationNetworkNode, CitationNetworkEdge>(network.edges).id((d) => d.id).distance(100))
-      .force('charge', d3.forceManyBody().strength(-300))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius(30))
+      .alpha(1)
+      .alphaDecay(0.01) // Slow decay for more iterations (was adaptive 0.01-0.05)
+      .alphaMin(0.0001) // Lower minimum for thorough settling
+      .velocityDecay(0.4) // Moderate damping to allow movement
+      // CRITICAL FIX #1: Lower link strength to prevent overriding collision
+      .force('link', d3.forceLink<CitationNetworkNode, CitationNetworkEdge>(network.edges)
+        .id((d) => d.id)
+        .distance((d) => {
+          const sourceNode = typeof d.source === 'object' ? d.source : network.nodes.find(n => n.id === d.source) || network.nodes[0]
+          const targetNode = typeof d.target === 'object' ? d.target : network.nodes.find(n => n.id === d.target) || network.nodes[0]
+          const sourceRadius = getCollisionRadius(sourceNode)
+          const targetRadius = getCollisionRadius(targetNode)
+          const baseDistance = sourceRadius + targetRadius + (linkDistanceBase * linkDistanceMultiplier)
+          const edge = d as any
+          const weight = typeof edge.weight === 'number' ? edge.weight : 1
+          return baseDistance * (0.8 + weight * 0.4)
+        })
+        .strength(0.1)) // CRITICAL: Low link strength (was 0.5-1.5) to prevent overriding collision
+      // CRITICAL FIX #2: Stronger repulsion
+      .force('charge', d3.forceManyBody<CitationNetworkNode>().strength((d) => {
+        const nodeRadius = getCollisionRadius(d)
+        const baseCharge = baseChargeStrength * chargeMultiplier * 1.5 // 50% stronger
+        const sizeFactor = 1 + (nodeRadius / 50)
+        return baseCharge * sizeFactor
+      }))
+      .force('center', d3.forceCenter(width / 2, height / 2).strength(0.02))
+      // CRITICAL FIX #3: Strong collision with multiple iterations
+      .force('collision', d3.forceCollide<CitationNetworkNode>()
+        .radius((d) => getCollisionRadius(d) * 1.15) // 15% padding
+        .strength(1.0)
+        .iterations(2)) // Multiple iterations for better collision resolution
+      .force('x', d3.forceX(width / 2).strength(0.01)) // Very weak X pull
+      .force('y', d3.forceY(height / 2).strength(0.01)) // Very weak Y pull
+      // CRITICAL FIX #4: Add strong separation force
+      .force('separation', (alpha: number) => {
+        const padding = 5
+        network.nodes.forEach((nodeA, i) => {
+          const radiusA = getCollisionRadius(nodeA)
+          network.nodes.forEach((nodeB, j) => {
+            if (i >= j) return
+            const radiusB = getCollisionRadius(nodeB)
+            const minDistance = radiusA + radiusB + padding
+            
+            if (nodeA.x !== undefined && nodeA.y !== undefined &&
+                nodeB.x !== undefined && nodeB.y !== undefined) {
+              const dx = nodeB.x - nodeA.x
+              const dy = nodeB.y - nodeA.y
+              const distance = Math.sqrt(dx * dx + dy * dy) || 1
+              
+              if (distance < minDistance) {
+                const force = (minDistance - distance) / distance * alpha * 0.5
+                const fx = dx * force
+                const fy = dy * force
+                nodeA.vx = (nodeA.vx || 0) - fx
+                nodeA.vy = (nodeA.vy || 0) - fy
+                nodeB.vx = (nodeB.vx || 0) + fx
+                nodeB.vy = (nodeB.vy || 0) + fy
+              }
+            }
+          })
+        })
+      })
+      .force('boundary', (alpha: number) => {
+        const padding = 10
+        network.nodes.forEach((node) => {
+          const radius = getCollisionRadius(node)
+          if (node.x !== undefined && node.x !== null) {
+            if (node.x + radius > width - padding) {
+              const pushBack = (node.x + radius - (width - padding)) * alpha * 2.0
+              node.vx = (node.vx || 0) - pushBack
+            }
+            if (node.x - radius < padding) {
+              const pushBack = ((padding + radius) - node.x) * alpha * 2.0
+              node.vx = (node.vx || 0) + pushBack
+            }
+          }
+          if (node.y !== undefined && node.y !== null) {
+            if (node.y + radius > height - padding) {
+              const pushBack = (node.y + radius - (height - padding)) * alpha * 2.0
+              node.vy = (node.vy || 0) - pushBack
+            }
+            if (node.y - radius < padding) {
+              const pushBack = ((padding + radius) - node.y) * alpha * 2.0
+              node.vy = (node.vy || 0) + pushBack
+            }
+          }
+        })
+      })
 
     // Create edges (lines) - properly typed for D3 force link
     type LinkDatum = d3.SimulationLinkDatum<CitationNetworkNode> & CitationNetworkEdge
@@ -205,20 +364,50 @@ export function CitationNetwork({ papers, citationNetworkResponse, width = 800, 
       })
       .call(drag(simulation))
 
-    // Create labels
+    // Create wrapped labels using foreignObject for proper text wrapping
+    const maxLabelWidth = 120 // Fixed max width for wrapping
+    const labelOffset = 15 // Horizontal offset from node center
+    const fontSize = 10
+    const lineHeight = fontSize * 1.2
+    
     const labels = g.append('g')
-      .selectAll('text')
+      .attr('class', 'labels')
+      .selectAll('g.label-group')
       .data(network.nodes)
       .enter()
-      .append('text')
-      .text((d) => {
-        const title = d.paper?.title || 'Unknown'
-        return title.length > 30 ? title.substring(0, 30) + '...' : title
+      .append('g')
+      .attr('class', 'label-group')
+    
+    // Create foreignObject for each label to enable text wrapping
+    const labelForeignObjects = labels.append('foreignObject')
+      .attr('width', maxLabelWidth)
+      .attr('height', (d) => {
+        const { height } = wrapText(d.paper?.title || 'Unknown', maxLabelWidth)
+        return height
       })
-      .attr('font-size', '10px')
-      .attr('fill', '#e5e7eb')
-      .attr('dx', 15)
-      .attr('dy', 4)
+      .attr('x', labelOffset)
+      .attr('y', (d) => {
+        const { height } = wrapText(d.paper?.title || 'Unknown', maxLabelWidth)
+        return -height / 2 // Vertically center the label
+      })
+    
+    // Create div elements inside foreignObject for text wrapping
+    labelForeignObjects.append('xhtml:div')
+      .style('font-size', `${fontSize}px`)
+      .style('color', '#e5e7eb')
+      .style('line-height', `${lineHeight}px`)
+      .style('font-family', 'system-ui, -apple-system, sans-serif')
+      .style('word-wrap', 'break-word')
+      .style('overflow-wrap', 'break-word')
+      .style('white-space', 'normal')
+      .style('width', `${maxLabelWidth}px`)
+      .html((d) => {
+        const { wrappedLines } = wrapText(d.paper?.title || 'Unknown', maxLabelWidth)
+        // Escape HTML and join lines with <br>
+        return wrappedLines
+          .map(line => line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
+          .join('<br>')
+      })
 
     // Create tooltip
     const tooltip = d3.select('body').append('div')
@@ -277,9 +466,12 @@ export function CitationNetwork({ papers, citationNetworkResponse, width = 800, 
         .attr('cx', (d) => d.x!)
         .attr('cy', (d) => d.y!)
 
-      labels
-        .attr('x', (d) => d.x!)
-        .attr('y', (d) => d.y!)
+      // Position label groups at node center (foreignObject handles offset internally)
+      labels.attr('transform', (d) => {
+        const x = d.x || 0
+        const y = d.y || 0
+        return `translate(${x},${y})`
+      })
     })
 
     // Cleanup

@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CitationTree } from './CitationTree'
-import { KeywordSelectionPanel } from './KeywordSelectionPanel'
 import { LoadingOverlay } from '@/components/ui/loading-overlay'
 import { SearchResultsSkeleton } from './SearchResultsSkeleton'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -35,7 +34,6 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
   const [saveToChat, setSaveToChat] = useState(true)
   const [citationNetworkResponse, setCitationNetworkResponse] = useState<CitationNetworkResponse | null>(null)
   const [loadingCitationNetwork, setLoadingCitationNetwork] = useState(false)
-  const [showKeywordSelectionPanel, setShowKeywordSelectionPanel] = useState(false)
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; timestamp: Date; papers?: VeritusPaper[] }>>([])
   
   // Determine if mock mode should be used (configurable via environment or defaults)
@@ -392,94 +390,6 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
     }
   }
 
-  const handleSearchSimilarPapers = async (params: {
-    corpusId: string
-    jobType: 'keywordSearch' | 'querySearch' | 'combinedSearch'
-    keywords?: string[]
-    tldrs?: string[]
-    authors?: string[]
-    references?: string[]
-    filters?: {
-      fieldsOfStudy?: string[]
-      minCitationCount?: number
-      openAccessPdf?: boolean
-      downloadable?: boolean
-      quartileRanking?: string[]
-      publicationTypes?: string[]
-      sort?: string
-      year?: string
-      limit?: 100 | 200 | 300
-    }
-  }) => {
-    setLoadingCorpus(true)
-    setError(null)
-    
-    try {
-      // Build query parameters
-      const queryParams = new URLSearchParams()
-      if (params.filters?.limit) {
-        queryParams.set('limit', params.filters.limit.toString())
-      }
-      if (params.filters?.fieldsOfStudy && params.filters.fieldsOfStudy.length > 0) {
-        queryParams.set('fieldsOfStudy', params.filters.fieldsOfStudy.join(','))
-      }
-      if (params.filters?.minCitationCount) {
-        queryParams.set('minCitationCount', params.filters.minCitationCount.toString())
-      }
-      if (params.filters?.openAccessPdf !== undefined) {
-        queryParams.set('openAccessPdf', params.filters.openAccessPdf.toString())
-      }
-      if (params.filters?.downloadable !== undefined) {
-        queryParams.set('downloadable', params.filters.downloadable.toString())
-      }
-      if (params.filters?.quartileRanking && params.filters.quartileRanking.length > 0) {
-        queryParams.set('quartileRanking', params.filters.quartileRanking.join(','))
-      }
-      if (params.filters?.publicationTypes && params.filters.publicationTypes.length > 0) {
-        queryParams.set('publicationTypes', params.filters.publicationTypes.join(','))
-      }
-      if (params.filters?.sort) {
-        queryParams.set('sort', params.filters.sort)
-      }
-      if (params.filters?.year) {
-        queryParams.set('year', params.filters.year)
-      }
-
-      // Build request body based on job type
-      const body: any = {}
-      if (params.jobType === 'keywordSearch' || params.jobType === 'combinedSearch') {
-        if (params.keywords && params.keywords.length > 0) {
-          body.phrases = params.keywords
-        }
-      }
-      if (params.jobType === 'querySearch' || params.jobType === 'combinedSearch') {
-        if (params.tldrs && params.tldrs.length > 0) {
-          // Combine TLDRs into a query string
-          body.query = params.tldrs.join(' ')
-        }
-      }
-
-      const response = await fetch(`/api/v1/job/create/${params.jobType}?${queryParams.toString()}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to search similar papers')
-      }
-
-      const data = await response.json()
-      // Handle response data here when API is implemented
-      console.log('Search similar papers response:', data)
-    } catch (err: any) {
-      console.error('Error searching similar papers:', err)
-      setError(err.message || 'Failed to search similar papers')
-    } finally {
-      setLoadingCorpus(false)
-    }
-  }
 
   return (
     <div className="flex-1 flex flex-col bg-background overflow-hidden">
@@ -735,15 +645,6 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
                     View Paper
                   </a>
                 )}
-                {searchResult.paper.id && (
-                  <Button
-                    onClick={() => setShowKeywordSelectionPanel(true)}
-                    className="bg-[#22c55e] hover:bg-[#16a34a] text-black"
-                  >
-                    <Search className="h-4 w-4 mr-2" />
-                    Search Similar Papers
-                  </Button>
-                )}
               </div>
               {loadingCorpus && (
                 <div className="mt-4 space-y-3">
@@ -931,18 +832,6 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
         </div>
       </div>
 
-      {/* Keyword Selection Panel */}
-      {searchResult?.paper?.id && (
-        <KeywordSelectionPanel
-          open={showKeywordSelectionPanel}
-          onOpenChange={setShowKeywordSelectionPanel}
-          corpusId={searchResult.paper.id}
-          messages={messages}
-          chatId={chatId}
-          depth={chatDepth}
-          onSearch={handleSearchSimilarPapers}
-        />
-      )}
 
       {/* Loading Overlay */}
       <LoadingOverlay

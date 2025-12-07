@@ -9,7 +9,7 @@ import {
   FileText,
   Edit2,
   Trash2,
-  MoreHorizontal,
+  MoreVertical,
   Star,
   Clock,
   X,
@@ -242,44 +242,37 @@ export function Sidebar({
                         <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
                         <span className="truncate">{chat.title}</span>
                       </SidebarMenuButton>
-                      <div className="flex items-center gap-1">
-                        <SidebarMenuAction
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleToggleFavorite(chat.id, true)
-                          }}
-                          className="opacity-0 group-hover/menu-item:opacity-100 transition-opacity"
-                        >
-                          <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                        </SidebarMenuAction>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <SidebarMenuAction className="opacity-0 group-hover/menu-item:opacity-100 transition-opacity">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </SidebarMenuAction>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent side="right" align="start" className="w-48">
-                            <DropdownMenuItem onClick={() => handleEditChat(chat)}>
-                              <Edit2 className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleToggleFavorite(chat.id, true)}
-                            >
-                              <Star className="mr-2 h-4 w-4" />
-                              Remove from Favorites
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              onClick={() => handleDeleteChat(chat.id)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <SidebarMenuAction className="opacity-0 group-hover/menu-item:opacity-100 transition-opacity">
+                            <MoreVertical className="h-4 w-4" />
+                          </SidebarMenuAction>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent side="right" align="start" className="w-52 bg-[#1a1a1a] border border-[#2a2a2a] shadow-lg">
+                          <DropdownMenuItem 
+                            onClick={() => handleEditChat(chat)}
+                            className="text-white hover:bg-[#2a2a2a] focus:bg-[#2a2a2a] cursor-pointer"
+                          >
+                            <Edit2 className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleToggleFavorite(chat.id, true)}
+                            className="text-white hover:bg-[#2a2a2a] focus:bg-[#2a2a2a] cursor-pointer"
+                          >
+                            <Star className="mr-2 h-4 w-4 fill-yellow-500 text-yellow-500" />
+                            Remove from Favorites
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator className="bg-[#2a2a2a]" />
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteChat(chat.id)}
+                            className="text-red-400 hover:bg-red-900/20 focus:bg-red-900/20 cursor-pointer"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>
@@ -315,44 +308,37 @@ export function Sidebar({
                           <Clock className="h-4 w-4" />
                           <span className="truncate">{chat.title}</span>
                         </SidebarMenuButton>
-                        <div className="flex items-center gap-1">
-                          <SidebarMenuAction
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleToggleFavorite(chat.id, false)
-                            }}
-                            className="opacity-0 group-hover/menu-item:opacity-100 transition-opacity"
-                          >
-                            <Star className="h-4 w-4" />
-                          </SidebarMenuAction>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <SidebarMenuAction className="opacity-0 group-hover/menu-item:opacity-100 transition-opacity">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </SidebarMenuAction>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent side="right" align="start" className="w-48">
-                              <DropdownMenuItem onClick={() => handleEditChat(chat)}>
-                                <Edit2 className="mr-2 h-4 w-4" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => handleToggleFavorite(chat.id, false)}
-                              >
-                                <Star className="mr-2 h-4 w-4" />
-                                Add to Favorites
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                onClick={() => handleDeleteChat(chat.id)}
-                                className="text-destructive"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <SidebarMenuAction className="opacity-0 group-hover/menu-item:opacity-100 transition-opacity">
+                              <MoreVertical className="h-4 w-4" />
+                            </SidebarMenuAction>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent side="right" align="start" className="w-52 bg-[#1a1a1a] border border-[#2a2a2a] shadow-lg">
+                            <DropdownMenuItem 
+                              onClick={() => handleEditChat(chat)}
+                              className="text-white hover:bg-[#2a2a2a] focus:bg-[#2a2a2a] cursor-pointer"
+                            >
+                              <Edit2 className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleToggleFavorite(chat.id, false)}
+                              className="text-white hover:bg-[#2a2a2a] focus:bg-[#2a2a2a] cursor-pointer"
+                            >
+                              <Star className="mr-2 h-4 w-4" />
+                              Add to Favorites
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-[#2a2a2a]" />
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteChat(chat.id)}
+                              className="text-red-400 hover:bg-red-900/20 focus:bg-red-900/20 cursor-pointer"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </SidebarMenuItem>
                     ))}
                   </SidebarMenu>
@@ -402,18 +388,21 @@ export function Sidebar({
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <SidebarMenuAction className="opacity-0 group-hover/menu-item:opacity-100 transition-opacity">
-                            <MoreHorizontal className="h-4 w-4" />
+                            <MoreVertical className="h-4 w-4" />
                           </SidebarMenuAction>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent side="right" align="start" className="w-48">
-                          <DropdownMenuItem onClick={() => handleEditProject(project)}>
+                        <DropdownMenuContent side="right" align="start" className="w-52 bg-[#1a1a1a] border border-[#2a2a2a] shadow-lg">
+                          <DropdownMenuItem 
+                            onClick={() => handleEditProject(project)}
+                            className="text-white hover:bg-[#2a2a2a] focus:bg-[#2a2a2a] cursor-pointer"
+                          >
                             <Edit2 className="mr-2 h-4 w-4" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
+                          <DropdownMenuSeparator className="bg-[#2a2a2a]" />
                           <DropdownMenuItem 
                             onClick={() => handleDeleteProject(project.id)}
-                            className="text-destructive"
+                            className="text-red-400 hover:bg-red-900/20 focus:bg-red-900/20 cursor-pointer"
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete
@@ -462,44 +451,37 @@ export function Sidebar({
                             <MessageSquare className="h-4 w-4" />
                             <span className="truncate">{chat.title}</span>
                           </SidebarMenuButton>
-                          <div className="flex items-center gap-1">
-                            <SidebarMenuAction
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleToggleFavorite(chat.id, false)
-                              }}
-                              className="opacity-0 group-hover/menu-item:opacity-100 transition-opacity"
-                            >
-                              <Star className="h-4 w-4" />
-                            </SidebarMenuAction>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <SidebarMenuAction className="opacity-0 group-hover/menu-item:opacity-100 transition-opacity">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </SidebarMenuAction>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent side="right" align="start" className="w-48">
-                                <DropdownMenuItem onClick={() => handleEditChat(chat)}>
-                                  <Edit2 className="mr-2 h-4 w-4" />
-                                  Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  onClick={() => handleToggleFavorite(chat.id, false)}
-                                >
-                                  <Star className="mr-2 h-4 w-4" />
-                                  Add to Favorites
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onClick={() => handleDeleteChat(chat.id)}
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <SidebarMenuAction className="opacity-0 group-hover/menu-item:opacity-100 transition-opacity">
+                                <MoreVertical className="h-4 w-4" />
+                              </SidebarMenuAction>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent side="right" align="start" className="w-52 bg-[#1a1a1a] border border-[#2a2a2a] shadow-lg">
+                              <DropdownMenuItem 
+                                onClick={() => handleEditChat(chat)}
+                                className="text-white hover:bg-[#2a2a2a] focus:bg-[#2a2a2a] cursor-pointer"
+                              >
+                                <Edit2 className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => handleToggleFavorite(chat.id, false)}
+                                className="text-white hover:bg-[#2a2a2a] focus:bg-[#2a2a2a] cursor-pointer"
+                              >
+                                <Star className="mr-2 h-4 w-4" />
+                                Add to Favorites
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-[#2a2a2a]" />
+                              <DropdownMenuItem 
+                                onClick={() => handleDeleteChat(chat.id)}
+                                className="text-red-400 hover:bg-red-900/20 focus:bg-red-900/20 cursor-pointer"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </SidebarMenuItem>
                       ))
                     )}
@@ -528,20 +510,26 @@ export function Sidebar({
                     <ChevronUp className="ml-auto h-4 w-4" />
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent side="top" align="end" className="w-56">
-                  <div className="p-2">
-                    <div className="text-sm font-medium text-sidebar-foreground">{user.name}</div>
-                    <div className="text-xs text-sidebar-foreground/70 truncate">{user.email}</div>
+                <DropdownMenuContent side="top" align="end" className="w-56 bg-[#1a1a1a] border border-[#2a2a2a] shadow-lg">
+                  <div className="p-3 border-b border-[#2a2a2a]">
+                    <div className="text-sm font-medium text-white">{user.name}</div>
+                    <div className="text-xs text-gray-400 truncate mt-0.5">{user.email}</div>
                   </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => {
-                    setShowBookmarksManagement(true)
-                  }}>
+                  <DropdownMenuSeparator className="bg-[#2a2a2a]" />
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      setShowBookmarksManagement(true)
+                    }}
+                    className="text-white hover:bg-[#2a2a2a] focus:bg-[#2a2a2a] cursor-pointer"
+                  >
                     <Bookmark className="mr-2 h-4 w-4" />
                     Bookmarks
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                  <DropdownMenuSeparator className="bg-[#2a2a2a]" />
+                  <DropdownMenuItem 
+                    onClick={handleLogout} 
+                    className="text-red-400 hover:bg-red-900/20 focus:bg-red-900/20 cursor-pointer"
+                  >
                     <LogOut className="mr-2 h-4 w-4" />
                     Logout
                   </DropdownMenuItem>

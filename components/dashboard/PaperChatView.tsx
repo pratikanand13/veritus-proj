@@ -320,7 +320,9 @@ export function PaperChatView({
       }
 
       // Build request body based on job type
-      const body: any = {}
+      const body: any = {
+        corpusId: params.corpusId, // Pass corpusId for phrase padding when chat doesn't have paperData
+      }
       if (params.jobType === 'keywordSearch' || params.jobType === 'combinedSearch') {
         if (params.keywords && params.keywords.length > 0) {
           body.phrases = params.keywords
