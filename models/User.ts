@@ -24,6 +24,7 @@ export interface IUser extends Document {
   bookmarks: Bookmark[]
   emailNotificationsEnabled: boolean
   emailNotificationHistory: EmailNotificationHistory[]
+  lastEmailSentDate?: Date // Track last daily email sent date
   createdAt: Date
   comparePassword(candidatePassword: string): Promise<boolean>
 }
@@ -81,6 +82,10 @@ const UserSchema = new Schema<IUser>({
       },
     ],
     default: [],
+  },
+  lastEmailSentDate: {
+    type: Date,
+    default: null,
   },
   createdAt: {
     type: Date,

@@ -16,6 +16,14 @@ interface PaperRecommendation {
   pdfLink?: string
 }
 
+interface DailyPaperRecommendation {
+  bookmarkTitle: string
+  paperTitle: string
+  tldr: string
+  paperId?: string
+  pdfLink?: string
+}
+
 /**
  * Create nodemailer transporter
  */
@@ -165,6 +173,129 @@ Based on your bookmarked papers, we found ${recommendations.length} new paper${r
 ${papersText}
 
 You're receiving this email because you have email notifications enabled for your bookmarked papers.
+  `.trim()
+}
+
+/**
+ * Send daily paper recommendation email to a user
+ * Based on a single bookmark and one recommended paper
+ */
+export async function sendDailyPaperEmail(
+  userEmail: string,
+  userName: string,
+  recommendation: DailyPaperRecommendation
+): Promise<void> {
+  if (!recommendation.tldr) {
+    console.log(`No TLDR to send for ${userEmail}`)
+    return
+  }
+
+  const transporter = createTransporter()
+
+  const emailHtml = generateDailyEmailTemplate(userName, recommendation)
+  const emailText = generateDailyEmailText(userName, recommendation)
+
+  try {
+    await transporter.sendMail({
+      from: `"Research Paper Recommendations" <${process.env.SMTP_USER}>`,
+      to: userEmail,
+      subject: `Your daily paper: ${recommendation.paperTitle}`,
+      html: emailHtml,
+      text: emailText,
+    })
+
+    console.log(`Daily email sent successfully to ${userEmail}`)
+  } catch (error) {
+    console.error(`Failed to send daily email to ${userEmail}:`, error)
+    throw error
+  }
+}
+
+/**
+ * Generate HTML email template for daily paper recommendation
+ */
+function generateDailyEmailTemplate(
+  userName: string,
+  recommendation: DailyPaperRecommendation
+): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Paper Recommendation</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0f0f0f; color: #ffffff; margin: 0; padding: 0;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <div style="background-color: #1a1a1a; border-radius: 12px; padding: 30px; border: 1px solid #2a2a2a;">
+      <h1 style="color: #ffffff; margin-top: 0; margin-bottom: 10px; font-size: 24px;">
+        📚 Your Daily Paper Recommendation
+      </h1>
+      <p style="color: #9ca3af; margin: 10px 0 30px 0; font-size: 14px;">
+        Hi ${escapeHtml(userName)},
+      </p>
+      <p style="color: #d1d5db; margin: 20px 0; line-height: 1.6;">
+        Here's a paper recommendation based on your bookmark: <strong>${escapeHtml(recommendation.bookmarkTitle)}</strong>
+      </p>
+      
+      <div style="margin: 30px 0; padding: 20px; background-color: #1a1a1a; border-radius: 8px; border-left: 4px solid #3b82f6;">
+        <h2 style="color: #ffffff; margin-top: 0; margin-bottom: 15px; font-size: 20px;">
+          ${escapeHtml(recommendation.paperTitle)}
+        </h2>
+        <p style="color: #d1d5db; margin: 15px 0; font-style: italic; line-height: 1.6;">
+          ${escapeHtml(recommendation.tldr)}
+        </p>
+        ${
+          recommendation.pdfLink
+            ? `<a href="${escapeHtml(recommendation.pdfLink)}" style="display: inline-block; margin-top: 15px; padding: 10px 20px; background-color: #3b82f6; color: #ffffff; text-decoration: none; border-radius: 4px; font-weight: 500;">
+          View PDF
+        </a>`
+            : ''
+        }
+        ${
+          recommendation.paperId
+            ? `<p style="color: #9ca3af; margin-top: 15px; font-size: 12px;">
+          Paper ID: ${escapeHtml(recommendation.paperId)}
+        </p>`
+            : ''
+        }
+      </div>
+      
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a;">
+        <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+          You're receiving this email because you have daily email notifications enabled for your bookmarked papers.
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+  `
+}
+
+/**
+ * Generate plain text email for daily paper recommendation
+ */
+function generateDailyEmailText(
+  userName: string,
+  recommendation: DailyPaperRecommendation
+): string {
+  return `
+Your Daily Paper Recommendation
+
+Hi ${userName},
+
+Here's a paper recommendation based on your bookmark: ${recommendation.bookmarkTitle}
+
+${recommendation.paperTitle}
+
+${recommendation.tldr}
+
+${recommendation.pdfLink ? `PDF: ${recommendation.pdfLink}` : ''}
+${recommendation.paperId ? `Paper ID: ${recommendation.paperId}` : ''}
+
+You're receiving this email because you have daily email notifications enabled for your bookmarked papers.
   `.trim()
 }
 
