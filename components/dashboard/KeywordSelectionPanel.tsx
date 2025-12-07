@@ -395,7 +395,7 @@ export function KeywordSelectionPanel({
       <DialogContent className="bg-[#1f1f1f] border-[#2a2a2a] text-white max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white text-2xl flex items-center gap-2">
-            <Hash className="h-6 w-6 text-[#FF6B35]" />
+            <Hash className="h-6 w-6 text-[#22c55e]" />
             Search Similar Papers
           </DialogTitle>
           <DialogDescription className="text-gray-400">
@@ -414,9 +414,9 @@ export function KeywordSelectionPanel({
 
           {/* Job Type Display */}
           {jobType && (
-            <div className="bg-[#171717] border border-[#FF6B35] rounded-md p-3">
+            <div className="bg-[#171717] border border-[#22c55e] rounded-md p-3">
               <p className="text-sm text-gray-300 mb-1">
-                <span className="text-[#FF6B35] font-medium">Job Type:</span> {jobType}
+                <span className="text-[#22c55e] font-medium">Job Type:</span> {jobType}
               </p>
               <p className="text-xs text-gray-400">
                 {jobType === 'combinedSearch' && 'Search using both phrases (keywords) and query string (TLDR)'}
@@ -454,7 +454,7 @@ export function KeywordSelectionPanel({
           <div>
             <div className="flex items-center justify-between mb-3">
               <Label className="text-white text-base font-medium flex items-center gap-2">
-                <Hash className="h-4 w-4 text-[#FF6B35]" />
+                <Hash className="h-4 w-4 text-[#22c55e]" />
                 Keywords
               </Label>
               <div className="flex items-center gap-2">
@@ -474,7 +474,7 @@ export function KeywordSelectionPanel({
                   <Badge
                     key={keyword}
                     variant="secondary"
-                    className="bg-[#FF6B35] text-white hover:bg-[#FF6B35]/80 cursor-pointer"
+                    className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer"
                     onClick={() => handleToggleKeyword(keyword)}
                   >
                     {keyword}
@@ -493,9 +493,9 @@ export function KeywordSelectionPanel({
                     <Badge
                       key={keyword}
                       variant="outline"
-                      className={`cursor-pointer border-[#2a2a2a] hover:border-[#FF6B35] ${
+                      className={`cursor-pointer border-[#2a2a2a] hover:border-[#22c55e] ${
                         selectedKeywords.includes(keyword)
-                          ? 'bg-[#FF6B35] text-white border-[#FF6B35]'
+                          ? 'bg-[#22c55e] text-black border-[#22c55e]'
                           : 'text-gray-300 hover:text-white'
                       }`}
                       onClick={() => handleToggleKeyword(keyword)}
@@ -524,7 +524,7 @@ export function KeywordSelectionPanel({
               <Button
                 onClick={handleAddCustomKeyword}
                 disabled={!customKeyword.trim()}
-                className="bg-[#FF6B35] hover:bg-[#FF6B35]/80"
+                className="bg-[#22c55e] hover:bg-[#16a34a] text-black"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -534,7 +534,7 @@ export function KeywordSelectionPanel({
           {/* TLDR Section */}
           <div>
             <Label className="text-white text-base font-medium flex items-center gap-2 mb-3">
-              <FileText className="h-4 w-4 text-[#FF6B35]" />
+              <FileText className="h-4 w-4 text-[#22c55e]" />
               TLDR
             </Label>
             <p className="text-sm text-gray-400 mb-3">
@@ -548,7 +548,7 @@ export function KeywordSelectionPanel({
                   <Badge
                     key={tldr}
                     variant="secondary"
-                    className="bg-[#FF6B35] text-white hover:bg-[#FF6B35]/80 cursor-pointer justify-start text-left p-2"
+                    className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer justify-start text-left p-2"
                     onClick={() => handleToggleTLDR(tldr)}
                   >
                     <span className="flex-1 truncate">{tldr}</span>
@@ -567,9 +567,9 @@ export function KeywordSelectionPanel({
                     <Badge
                       key={tldr}
                       variant="outline"
-                      className={`cursor-pointer border-[#2a2a2a] hover:border-[#FF6B35] text-left p-2 ${
+                      className={`cursor-pointer border-[#2a2a2a] hover:border-[#22c55e] text-left p-2 ${
                         selectedTLDRs.includes(tldr)
-                          ? 'bg-[#FF6B35] text-white border-[#FF6B35]'
+                          ? 'bg-[#22c55e] text-black border-[#22c55e]'
                           : 'text-gray-300 hover:text-white'
                       }`}
                       onClick={() => handleToggleTLDR(tldr)}
@@ -585,7 +585,7 @@ export function KeywordSelectionPanel({
           {/* Authors Section */}
           <div>
             <Label className="text-white text-base font-medium flex items-center gap-2 mb-3">
-              <Users className="h-4 w-4 text-[#FF6B35]" />
+              <Users className="h-4 w-4 text-[#22c55e]" />
               Authors
             </Label>
             <p className="text-sm text-gray-400 mb-3">
@@ -599,7 +599,7 @@ export function KeywordSelectionPanel({
                   <Badge
                     key={author}
                     variant="secondary"
-                    className="bg-[#FF6B35] text-white hover:bg-[#FF6B35]/80 cursor-pointer"
+                    className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer"
                     onClick={() => handleToggleAuthor(author)}
                   >
                     {author}
@@ -618,9 +618,9 @@ export function KeywordSelectionPanel({
                     <Badge
                       key={author}
                       variant="outline"
-                      className={`cursor-pointer border-[#2a2a2a] hover:border-[#FF6B35] ${
+                      className={`cursor-pointer border-[#2a2a2a] hover:border-[#22c55e] ${
                         selectedAuthors.includes(author)
-                          ? 'bg-[#FF6B35] text-white border-[#FF6B35]'
+                          ? 'bg-[#22c55e] text-black border-[#22c55e]'
                           : 'text-gray-300 hover:text-white'
                       }`}
                       onClick={() => handleToggleAuthor(author)}
@@ -636,7 +636,7 @@ export function KeywordSelectionPanel({
           {/* References Section */}
           <div>
             <Label className="text-white text-base font-medium flex items-center gap-2 mb-3">
-              <BookOpen className="h-4 w-4 text-[#FF6B35]" />
+              <BookOpen className="h-4 w-4 text-[#22c55e]" />
               References
             </Label>
             <p className="text-sm text-gray-400 mb-3">
@@ -650,7 +650,7 @@ export function KeywordSelectionPanel({
                   <Badge
                     key={ref}
                     variant="secondary"
-                    className="bg-[#FF6B35] text-white hover:bg-[#FF6B35]/80 cursor-pointer max-w-xs truncate"
+                    className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer max-w-xs truncate"
                     onClick={() => handleToggleReference(ref)}
                   >
                     {ref}
@@ -669,9 +669,9 @@ export function KeywordSelectionPanel({
                     <Badge
                       key={ref}
                       variant="outline"
-                      className={`cursor-pointer border-[#2a2a2a] hover:border-[#FF6B35] max-w-xs truncate ${
+                      className={`cursor-pointer border-[#2a2a2a] hover:border-[#22c55e] max-w-xs truncate ${
                         selectedReferences.includes(ref)
-                          ? 'bg-[#FF6B35] text-white border-[#FF6B35]'
+                          ? 'bg-[#22c55e] text-black border-[#22c55e]'
                           : 'text-gray-300 hover:text-white'
                       }`}
                       onClick={() => handleToggleReference(ref)}
@@ -733,7 +733,7 @@ export function KeywordSelectionPanel({
                         <Badge
                           key={field}
                           variant="secondary"
-                          className="bg-[#FF6B35] text-white hover:bg-[#FF6B35]/80 cursor-pointer"
+                          className="bg-[#22c55e] text-black hover:bg-[#16a34a] cursor-pointer"
                           onClick={() => handleToggleFieldOfStudy(field)}
                         >
                           {field}
@@ -788,9 +788,9 @@ export function KeywordSelectionPanel({
                       <Badge
                         key={quartile}
                         variant="outline"
-                        className={`cursor-pointer border-[#2a2a2a] hover:border-[#FF6B35] ${
+                        className={`cursor-pointer border-[#2a2a2a] hover:border-[#22c55e] ${
                           selectedQuartileRankings.includes(quartile)
-                            ? 'bg-[#FF6B35] text-white border-[#FF6B35]'
+                            ? 'bg-[#22c55e] text-black border-[#22c55e]'
                             : 'text-gray-300 hover:text-white'
                         }`}
                         onClick={() => handleToggleQuartileRanking(quartile)}
@@ -809,9 +809,9 @@ export function KeywordSelectionPanel({
                       <Badge
                         key={type}
                         variant="outline"
-                        className={`cursor-pointer border-[#2a2a2a] hover:border-[#FF6B35] ${
+                        className={`cursor-pointer border-[#2a2a2a] hover:border-[#22c55e] ${
                           selectedPublicationTypes.includes(type)
-                            ? 'bg-[#FF6B35] text-white border-[#FF6B35]'
+                            ? 'bg-[#22c55e] text-black border-[#22c55e]'
                             : 'text-gray-300 hover:text-white'
                         }`}
                         onClick={() => handleTogglePublicationType(type)}
@@ -893,7 +893,7 @@ export function KeywordSelectionPanel({
           <Button
             onClick={handleSearch}
             disabled={!jobType}
-            className="bg-[#FF6B35] hover:bg-[#FF6B35]/80 text-white disabled:opacity-50"
+            className="bg-[#22c55e] hover:bg-[#16a34a] text-black disabled:opacity-50"
           >
             Search Papers
           </Button>

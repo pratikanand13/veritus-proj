@@ -82,25 +82,26 @@ const AccessCard = ({
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white">
           {icon}
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-white">{label}</p>
           <p className="text-xs text-slate-400 break-all">{available && href ? href : 'Not available'}</p>
         </div>
       </div>
-      <div className="flex items-center justify-end gap-2">
+      <div className="mt-auto flex items-center justify-start gap-2">
         <Button
           asChild={available}
-          variant="outline"
-          size="sm"
           disabled={!available}
-          className="rounded-full border-white/20 bg-white/5 text-white hover:bg-white/10"
+          className={available 
+            ? "bg-[#22c55e] hover:bg-[#16a34a] text-black px-4 py-2 w-full" 
+            : "bg-gray-600 text-gray-400 cursor-not-allowed px-4 py-2 w-full"
+          }
         >
           {available ? (
-            <a href={href!} target="_blank" rel="noopener noreferrer">
+            <a href={href!} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center">
               {buttonLabel}
             </a>
           ) : (
-            <span>{buttonLabel}</span>
+            <span className="flex items-center justify-center">{buttonLabel}</span>
           )}
         </Button>
       </div>
