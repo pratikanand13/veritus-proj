@@ -1,16 +1,103 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { VeritusPaper } from '@/types/veritus'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { FileText, Users, Calendar, BookOpen, ExternalLink, Sparkles, Tag } from 'lucide-react'
+import { FileText, Users, Calendar, BookOpen, ExternalLink, Sparkles, Tag, Bookmark, BookmarkCheck, Loader2 } from 'lucide-react'
+import { toast } from '@/lib/utils/toast'
 
 interface PaperAccordionProps {
   papers: VeritusPaper[]
+  onCreateChatFromHeading?: (title: string) => Promise<string | null>
 }
 
-export function PaperAccordion({ papers }: PaperAccordionProps) {
+export function PaperAccordion({ papers, onCreateChatFromHeading }: PaperAccordionProps) {
+  const [bookmarks, setBookmarks] = useState<Set<string>>(new Set())
+  const [bookmarkingIds, setBookmarkingIds] = useState<Set<string>>(new Set())
+
+  // Fetch bookmarks on mount
+  useEffect(() => {
+    const fetchBookmarks = async () => {
+      try {
+        const response = await fetch('/api/bookmarks')
+        if (response.ok) {
+          const data = await response.json()
+          const bookmarkIds = new Set<string>(
+            (data.bookmarks || [])
+              .map((b: any) => String(b.paperId))
+              .filter((id: string) => id && id !== 'undefined' && id !== 'null')
+          )
+          setBookmarks(bookmarkIds)
+        }
+      } catch (error: any) {
+        // Silently fail - bookmarks are optional
+      }
+    }
+    fetchBookmarks()
+  }, [])
+
+  const handleBookmark = async (paper: VeritusPaper, e: React.MouseEvent) => {
+    e.stopPropagation()
+    
+    if (!paper.id || bookmarkingIds.has(paper.id)) return
+
+    const isBookmarked = bookmarks.has(paper.id)
+    setBookmarkingIds(prev => new Set(prev).add(paper.id))
+
+    try {
+      if (isBookmarked) {
+        // Remove bookmark
+        const response = await fetch(`/api/bookmarks?paperId=${paper.id}`, {
+          method: 'DELETE',
+        })
+        if (response.ok) {
+          setBookmarks(prev => {
+            const newSet = new Set(prev)
+            newSet.delete(paper.id)
+            return newSet
+          })
+          toast.success('Bookmark removed', 'Paper removed from your bookmarks')
+        } else {
+          const errorData = await response.json()
+          toast.error('Failed to remove bookmark', errorData.error || 'An unexpected error occurred')
+        }
+      } else {
+        // Add bookmark
+        const response = await fetch('/api/bookmarks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            paperId: paper.id,
+            paper: paper,
+          }),
+        })
+        if (response.ok) {
+          setBookmarks(prev => new Set(prev).add(paper.id))
+          toast.success('Bookmarked', 'Paper added to your bookmarks for cron email notifications')
+        } else {
+          const errorData = await response.json()
+          if (errorData.error?.includes('already bookmarked')) {
+            // Already bookmarked, just update state
+            setBookmarks(prev => new Set(prev).add(paper.id))
+            toast.info('Already bookmarked', 'This paper is already in your bookmarks')
+          } else {
+            toast.error('Failed to bookmark', errorData.error || 'An unexpected error occurred')
+          }
+        }
+      }
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
+      toast.error('Failed to bookmark', errorMessage)
+    } finally {
+      setBookmarkingIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(paper.id)
+        return newSet
+      })
+    }
+  }
   if (papers.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -30,7 +117,18 @@ export function PaperAccordion({ papers }: PaperAccordionProps) {
           <AccordionTrigger className="hover:no-underline">
             <div className="flex items-start justify-between w-full pr-4">
               <div className="flex-1 text-left">
-                <h3 className="font-semibold text-foreground mb-1">{paper.title}</h3>
+                <h3 
+                  className="font-semibold text-foreground mb-1 cursor-pointer hover:text-[#22c55e] transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (onCreateChatFromHeading && paper.title) {
+                      onCreateChatFromHeading(paper.title)
+                    }
+                  }}
+                  title="Click to create a new chat with this paper title"
+                >
+                  {paper.title}
+                </h3>
                 <div className="flex items-center gap-3 text-sm text-muted-foreground">
                   {paper.year && (
                     <span className="flex items-center gap-1">
@@ -51,6 +149,23 @@ export function PaperAccordion({ papers }: PaperAccordionProps) {
                   )}
                 </div>
               </div>
+              {/* Bookmark Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-2 h-8 w-8 p-0 hover:bg-accent"
+                onClick={(e) => handleBookmark(paper, e)}
+                disabled={bookmarkingIds.has(paper.id || '')}
+                title={bookmarks.has(paper.id || '') ? 'Remove bookmark' : 'Bookmark for cron email notifications'}
+              >
+                {bookmarkingIds.has(paper.id || '') ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                ) : bookmarks.has(paper.id || '') ? (
+                  <BookmarkCheck className="h-4 w-4 text-[#22c55e]" />
+                ) : (
+                  <Bookmark className="h-4 w-4 text-muted-foreground hover:text-[#22c55e]" />
+                )}
+              </Button>
             </div>
           </AccordionTrigger>
           <AccordionContent>

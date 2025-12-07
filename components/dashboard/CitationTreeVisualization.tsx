@@ -10,6 +10,9 @@ import { GraphNode, NodeTransferPayload } from '@/types/graph-node'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { KeywordSelectionPanel } from '@/components/dashboard/KeywordSelectionPanel'
 import { Checkbox } from '@/components/ui/checkbox'
+import { extractKeywords } from '@/lib/utils/keyword-extractor'
+import { toast } from '@/lib/utils/toast'
+import { isDebugMode } from '@/lib/config/mock-config'
 
 interface CitationTreeVisualizationProps {
   citationNetworkResponse?: CitationNetworkResponse
@@ -410,67 +413,107 @@ export function CitationTreeVisualization({
       const references = new Set<string>()
       const tldrs = new Set<string>()
 
-      // Helper to extract data from a paper
+      // Helper to extract data from a paper (current node + parent nodes)
+      // ONLY from node context - no historical keywords, no global preferences, no inference beyond node
       const extractFromPaper = (paper: VeritusPaper | null | undefined) => {
         if (!paper) return
         
-        // Keywords from fieldsOfStudy
+        // 1. Keywords from fieldsOfStudy (domain tags)
         if (paper.fieldsOfStudy && Array.isArray(paper.fieldsOfStudy)) {
-          paper.fieldsOfStudy.forEach(kw => keywords.add(kw))
+          paper.fieldsOfStudy.forEach(kw => {
+            if (kw && kw.trim()) keywords.add(kw.trim())
+          })
         }
         
-        // Authors
+        // 2. Extract meaningful keywords from title, abstract, TLDR using utility
+        const extractedKeywords = extractKeywords(paper)
+        extractedKeywords.forEach(kw => {
+          if (kw && kw.trim() && kw.length >= 3) {
+            keywords.add(kw.trim())
+          }
+        })
+        
+        // 3. Title as reference
+        if (paper.title && !paper.title.startsWith('corpus:')) {
+          references.add(paper.title)
+        }
+        
+        // 4. Keywords from publicationType (domain tag)
+        if (paper.publicationType && paper.publicationType.trim()) {
+          keywords.add(paper.publicationType.trim())
+        }
+        
+        // 5. Journal name as keyword (domain tag)
+        if (paper.journalName && paper.journalName.trim()) {
+          keywords.add(paper.journalName.trim())
+        }
+        
+        // 6. Authors
         if (paper.authors) {
           const authorList = paper.authors.split(',').map(a => a.trim()).filter(Boolean)
           authorList.forEach(author => authors.add(author))
         }
         
-        // Title as reference
-        if (paper.title && !paper.title.startsWith('corpus:')) {
-          references.add(paper.title)
-        }
-        
-        // TLDR
+        // 7. TLDR (summary/description)
         if (paper.tldr && paper.tldr.trim()) {
           tldrs.add(paper.tldr.trim())
         }
       }
 
-      // Extract from current node (fetch from chatstore if needed)
+      // Extract from current node (ALWAYS fetch fresh from chatstore)
       if (selectedNodeForMetadata.paperId) {
+        let paperId = selectedNodeForMetadata.paperId.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
+        
+        // Always fetch fresh data from chatstore (respect DEBUG env, no forced mock)
         try {
-          let paperId = selectedNodeForMetadata.paperId.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
-          const response = await fetch(`/api/v1/papers/${paperId}?chatId=${chatId}&mock=true`)
+          const response = await fetch(`/api/v1/papers/${paperId}?chatId=${chatId}`)
           if (response.ok) {
             const data = await response.json()
             if (data.paper) {
+              // Use fresh data from chatstore
               extractFromPaper(data.paper)
             }
+          } else {
+            // Fallback to cached data if fetch fails
+            extractFromPaper(selectedNodeForMetadata.paper)
           }
-        } catch (error) {
-          console.error('Error fetching current node paper:', error)
+        } catch (error: any) {
+          // Fallback to cached data on error
+          extractFromPaper(selectedNodeForMetadata.paper)
         }
-        // Also use existing paper data if available
+      } else if (selectedNodeForMetadata.paper) {
+        // Use existing paper data if no paperId
         extractFromPaper(selectedNodeForMetadata.paper)
       }
 
-      // Extract from parent nodes (fetch from chatstore)
+      // Extract from parent nodes (ALWAYS fetch fresh from chatstore)
       const parentNodes = getParentNodes(treeData, treeData, selectedNodeForMetadata.id)
       for (const parentNode of parentNodes) {
         if (parentNode.paperId) {
+          let paperId = parentNode.paperId.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
+          
+          // Always fetch fresh data from chatstore for parent nodes (respect DEBUG env, no forced mock)
           try {
-            let paperId = parentNode.paperId.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
-            const response = await fetch(`/api/v1/papers/${paperId}?chatId=${chatId}&mock=true`)
+            const response = await fetch(`/api/v1/papers/${paperId}?chatId=${chatId}`)
             if (response.ok) {
               const data = await response.json()
               if (data.paper) {
+                // Use fresh data from chatstore
                 extractFromPaper(data.paper)
+              } else {
+                // Fallback to cached data
+                extractFromPaper(parentNode.paper)
               }
+            } else {
+              // Fallback to cached data if fetch fails
+              extractFromPaper(parentNode.paper)
             }
-          } catch (error) {
-            console.error('Error fetching parent node paper:', error)
+          } catch (error: any) {
+            // Fallback to cached data on error
+            extractFromPaper(parentNode.paper)
           }
-          // Also use existing paper data if available
+        } else if (parentNode.paper) {
+          // Use existing paper data if no paperId
           extractFromPaper(parentNode.paper)
         }
       }
@@ -483,10 +526,14 @@ export function CitationTreeVisualization({
       })
     }
 
+    // Always fetch when panel opens or node changes (ensures fresh data)
     if (keywordPanelOpen && selectedNodeForMetadata) {
       fetchSuggestionsFromChatstore()
+    } else {
+      // Clear suggestions when panel closes
+      setKeywordSuggestions({})
     }
-  }, [selectedNodeForMetadata, chatId, treeData, keywordPanelOpen])
+  }, [selectedNodeForMetadata?.id, chatId, keywordPanelOpen]) // Removed treeData to avoid stale data
 
   // Create empty node
   const handleAddEmptyNode = () => {
@@ -543,7 +590,7 @@ export function CitationTreeVisualization({
     
     // Prevent multiple simultaneous searches
     if (searchInProgress) {
-      console.warn('Search already in progress, ignoring duplicate request')
+      toast.info('Search in progress', 'Please wait for the current search to complete')
       return
     }
     
@@ -607,24 +654,63 @@ export function CitationTreeVisualization({
         throw new Error('No job ID returned')
       }
       
-      // Step 3: Poll for job completion (returns mock results)
-      const statusResponse = await fetch(`/api/veritus/job/${jobId}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      })
+      // Step 3: Poll for job completion
+      // For mock mode: 3 second timeout, for real API: 60 second timeout (default)
+      const isMock = isDebugMode() || jobId.startsWith('mock-job-')
+      let attempts = 0
+      const maxAttempts = isMock ? 2 : 30 // Mock: 2 attempts * 1.5s ≈ 3s, Real: 30 attempts * 2s = 60s
+      const pollInterval = isMock ? 1500 : 2000 // Mock: 1.5s, Real: 2s
+      let papers: VeritusPaper[] = []
+      let statusData: any = null
       
-      if (!statusResponse.ok) {
-        throw new Error('Failed to get job status')
+      while (attempts < maxAttempts) {
+        // Wait before checking status
+        await new Promise(resolve => setTimeout(resolve, pollInterval))
+        
+        const statusResponse = await fetch(`/api/veritus/job/${jobId}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        })
+        
+        if (!statusResponse.ok) {
+          throw new Error('Failed to get job status')
+        }
+        
+        statusData = await statusResponse.json()
+        
+        if (statusData.status === 'success') {
+          papers = statusData.results || []
+          break
+        } else if (statusData.status === 'error') {
+          throw new Error('Job failed')
+        }
+        
+        attempts++
       }
       
-      const statusData = await statusResponse.json()
-      const papers: VeritusPaper[] = statusData.results || []
+      // Check if we timed out or got results
+      if (!papers || papers.length === 0) {
+        if (isMock) {
+          throw new Error('Search timed out or returned no results')
+        } else {
+          // For real API, check final status
+          const finalStatusResponse = await fetch(`/api/veritus/job/${jobId}`)
+          if (finalStatusResponse.ok) {
+            const finalStatus = await finalStatusResponse.json()
+            if (finalStatus.status === 'queued' || finalStatus.status === 'processing') {
+              throw new Error('Search timed out after 60 seconds. The job is still processing. Please try again later.')
+            }
+          }
+          throw new Error('Search timed out after 60 seconds or returned no results')
+        }
+      }
       
       // Step 4: Auto-close popup if still open (before adding nodes)
       setSearchPopupOpen(false)
       
       if (papers.length > 0) {
         // Step 5: Add papers as child nodes under the selected node
+        // Replace empty nodes with actual paper data, or add new nodes if no empty nodes exist
         const addPapersToTree = (node: GraphNode | null): GraphNode | null => {
           if (!node) return null
           if (node.id === selectedNodeForMetadata.id) {
@@ -647,10 +733,55 @@ export function CitationTreeVisualization({
               } as GraphNode
             })
             
-            // Add new children to existing children (don't replace)
+            // Check if there are empty nodes to replace
+            const existingChildren = node.children || []
+            const emptyNodeIndices: number[] = []
+            existingChildren.forEach((child, idx) => {
+              // Check if this is an empty node (label is "New Node" or tracked in emptyNodes)
+              if (child.label === 'New Node' || child.displayLabel === 'New Node' || 
+                  child.id.startsWith('empty-') || emptyNodes.has(child.id)) {
+                emptyNodeIndices.push(idx)
+              }
+            })
+            
+            // Replace empty nodes with actual paper data
+            let updatedChildren = [...existingChildren]
+            const emptyNodesToRemove = new Set<string>()
+            
+            if (emptyNodeIndices.length > 0) {
+              // Replace empty nodes with paper data (one-to-one replacement)
+              emptyNodeIndices.forEach((emptyIdx, paperIdx) => {
+                if (paperIdx < newChildren.length) {
+                  const emptyNode = updatedChildren[emptyIdx]
+                  emptyNodesToRemove.add(emptyNode.id)
+                  updatedChildren[emptyIdx] = newChildren[paperIdx]
+                }
+              })
+              
+              // Add remaining papers as new children if we have more papers than empty nodes
+              if (newChildren.length > emptyNodeIndices.length) {
+                updatedChildren = [
+                  ...updatedChildren,
+                  ...newChildren.slice(emptyNodeIndices.length)
+                ]
+              }
+            } else {
+              // No empty nodes to replace, just add new children
+              updatedChildren = [...updatedChildren, ...newChildren]
+            }
+            
+            // Remove replaced empty nodes from tracking
+            if (emptyNodesToRemove.size > 0) {
+              setEmptyNodes(prev => {
+                const next = new Map(prev)
+                emptyNodesToRemove.forEach(id => next.delete(id))
+                return next
+              })
+            }
+            
             return {
               ...node,
-              children: [...(node.children || []), ...newChildren],
+              children: updatedChildren,
             }
           }
           // Recursively update children
@@ -678,10 +809,10 @@ export function CitationTreeVisualization({
           })
           
           if (!storeResponse.ok) {
-            console.warn('Failed to update chatstore, but papers were added to graph')
+            toast.warning('Failed to update chat store', 'Papers were added to graph but may not be saved')
           }
-        } catch (error) {
-          console.error('Error updating chatstore:', error)
+        } catch (error: any) {
+          toast.warning('Failed to update chat store', error?.message || 'Papers were added to graph but may not be saved')
           // Don't fail the entire operation if chatstore update fails
         }
       }
@@ -689,10 +820,44 @@ export function CitationTreeVisualization({
       // Close panels after successful search
       setKeywordPanelOpen(false)
       setMetadataPopupOpen(false)
-    } catch (error) {
-      console.error('Error searching similar papers:', error)
+    } catch (error: any) {
+      toast.error('Failed to search similar papers', error?.message || 'An unexpected error occurred')
       // Close popup on error
       setSearchPopupOpen(false)
+      
+      // Clean up empty nodes that were created but never got data
+      // Remove empty nodes that are children of the selected node
+      if (selectedNodeForMetadata) {
+        const removeEmptyNodesFromTree = (node: GraphNode | null): GraphNode | null => {
+          if (!node) return null
+          if (node.id === selectedNodeForMetadata.id) {
+            // Filter out empty nodes from children
+            const filteredChildren = (node.children || []).filter(child => {
+              const isEmpty = child.label === 'New Node' || 
+                             child.displayLabel === 'New Node' || 
+                             child.id.startsWith('empty-') || 
+                             emptyNodes.has(child.id)
+              if (isEmpty) {
+                setEmptyNodes(prev => {
+                  const next = new Map(prev)
+                  next.delete(child.id)
+                  return next
+                })
+              }
+              return !isEmpty
+            })
+            return {
+              ...node,
+              children: filteredChildren,
+            }
+          }
+          return {
+            ...node,
+            children: node.children?.map(removeEmptyNodesFromTree).filter(Boolean) as GraphNode[],
+          }
+        }
+        setTreeData(prev => prev ? removeEmptyNodesFromTree(prev) : null)
+      }
     } finally {
       // Clear loading state and re-enable UI
       setSearchInProgress(false)
@@ -707,18 +872,17 @@ export function CitationTreeVisualization({
   // Handler for creating a new chat from a node (single-node root)
   const handleCreateChatFromNode = async (node: GraphNode) => {
     if (!onCreateChatFromNode) {
-      console.error('Cannot create chat: onCreateChatFromNode not provided')
+      toast.error('Cannot create chat', 'Chat creation handler not available')
       return
     }
     if (!chatId) {
-      console.error('Cannot create chat: missing chatId')
+      toast.error('Cannot create chat', 'Chat ID is missing')
       return
     }
 
     // Validate node data
     if (!node || !node.id) {
-      console.error('Invalid node provided to handleCreateChatFromNode:', node)
-      alert('Invalid node selected. Please try again.')
+      toast.warning('Invalid node selected', 'Please try selecting a different node')
       return
     }
 
@@ -731,15 +895,15 @@ export function CitationTreeVisualization({
 
     // Verify we're using the correct node
     if (selectedNodeForMetadata && selectedNodeForMetadata.id !== node.id) {
-      console.warn('Node mismatch detected! Using provided node:', node.id, 'but selectedNodeForMetadata is:', selectedNodeForMetadata.id)
-      // Still proceed, but log the warning
+      toast.warning('Node mismatch detected', 'Using different node than expected')
+      // Still proceed, but show the warning
     }
 
     // Indicate loading on this node
     setLoadingNodes(prev => new Set(prev).add(node.id))
 
     try {
-      // Fetch full paper from chatstore (mock-aware) to ensure all fields are present
+      // Fetch full paper from chatstore (respects DEBUG env) to ensure all fields are present
       let paperId = node.paperId || node.paper?.id
       if (paperId) {
         paperId = paperId.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
@@ -749,20 +913,30 @@ export function CitationTreeVisualization({
 
       let fullPaper: VeritusPaper | null = null
 
-      if (paperId) {
+      // First, try to use already-fetched metadata from chatstore (if available and matches this node)
+      if (nodeMetadataFromChatstore && 
+          (nodeMetadataFromChatstore.id?.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim() === paperId ||
+           node.paperId?.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim() === paperId ||
+           !paperId)) {
+        fullPaper = nodeMetadataFromChatstore
+        console.log('Using nodeMetadataFromChatstore:', fullPaper.title)
+      } else if (paperId) {
+        // Fetch real data from chatstore (respects DEBUG env, no forced mock)
         try {
-          const response = await fetch(`/api/v1/papers/${paperId}?chatId=${chatId}&mock=true`)
+          const response = await fetch(`/api/v1/papers/${paperId}?chatId=${chatId}`)
           if (response.ok) {
             const data = await response.json()
             if (data.paper) {
               fullPaper = data.paper as VeritusPaper
               console.log('Fetched paper from API:', fullPaper.title)
+              // Update nodeMetadataFromChatstore for future use
+              setNodeMetadataFromChatstore(fullPaper)
             }
           } else {
-            console.warn('Failed to fetch paper from API, using node.paper as fallback')
+            toast.warning('Failed to fetch paper details', 'Using cached data')
           }
-        } catch (error) {
-          console.error('Error fetching paper for create chat:', error)
+        } catch (error: any) {
+          toast.warning('Failed to fetch paper details', error?.message || 'Using cached data')
         }
       }
 
@@ -773,8 +947,7 @@ export function CitationTreeVisualization({
       }
 
       if (!fullPaper) {
-        console.error('Cannot create chat: no paper data available for node:', node.id)
-        alert('No paper data available for this node. Please try selecting a different node.')
+        toast.warning('No paper data available', 'Please try selecting a different node')
         return
       }
 
@@ -783,9 +956,8 @@ export function CitationTreeVisualization({
       const expectedPaperId = paperId || node.paperId?.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()
       
       if (expectedPaperId && fetchedPaperId && fetchedPaperId !== expectedPaperId) {
-        console.warn('Paper ID mismatch! Expected:', expectedPaperId, 'Got:', fetchedPaperId)
-        console.warn('Node paperId:', node.paperId, 'Fetched paper id:', fullPaper.id)
-        // Still proceed, but log the warning
+        toast.warning('Paper ID mismatch', 'Using different paper than expected')
+        // Still proceed, but show the warning
       }
 
       console.log('Final paper to create chat with:', {
@@ -827,20 +999,18 @@ export function CitationTreeVisualization({
       const newChatId = await onCreateChatFromNode(fullPaper, new Map(nodeSelectedFields), nodeContext)
       
       if (!newChatId) {
-        console.error('Failed to create chat: onCreateChatFromNode returned null')
-        alert('Failed to create new chat. Please try again.')
+        toast.error('Failed to create chat', 'Please try again')
         return
       }
       
-      console.log('Chat created successfully with ID:', newChatId)
+      toast.success('Chat created successfully')
 
       // Reset UI state
       setMetadataPopupOpen(false)
       setKeywordPanelOpen(false)
       setSelectedNodeForMetadata(null)
-    } catch (error) {
-      console.error('Error creating chat from node:', error)
-      alert(`Error creating chat: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } catch (error: any) {
+      toast.error('Failed to create chat', error?.message || 'Unknown error')
     } finally {
       // Clear loading indicator
       setLoadingNodes(prev => {
@@ -1451,7 +1621,8 @@ export function CitationTreeVisualization({
             console.log('Fetching paper metadata for paperId:', paperId)
             
             if (paperId && chatId) {
-              const response = await fetch(`/api/v1/papers/${paperId}?chatId=${chatId}&mock=true`)
+              // Fetch real data from chatstore (respects DEBUG env, no forced mock)
+              const response = await fetch(`/api/v1/papers/${paperId}?chatId=${chatId}`)
               if (response.ok) {
                 const data = await response.json()
                 if (data.paper) {
@@ -1623,7 +1794,8 @@ export function CitationTreeVisualization({
           console.log('Fetching paper metadata for paperId:', paperId)
           
           if (paperId && chatId) {
-            const response = await fetch(`/api/v1/papers/${paperId}?chatId=${chatId}&mock=true`)
+            // Fetch real data from chatstore (respects DEBUG env, no forced mock)
+            const response = await fetch(`/api/v1/papers/${paperId}?chatId=${chatId}`)
             if (response.ok) {
               const data = await response.json()
               if (data.paper) {
@@ -2275,8 +2447,7 @@ export function CitationTreeVisualization({
 
   const handleDownloadPNG = async () => {
     if (!svgRef.current) {
-      console.error('SVG ref not available')
-      alert('Graph not ready for export. Please wait a moment and try again.')
+      toast.warning('Graph not ready', 'Please wait a moment and try again')
       return
     }
 
@@ -2320,8 +2491,7 @@ export function CitationTreeVisualization({
       const ctx = canvas.getContext('2d')
       
       if (!ctx) {
-        console.error('Could not get canvas context')
-        alert('Failed to export graph. Please try again.')
+        toast.error('Failed to export graph', 'Could not get canvas context')
         return
       }
 
@@ -2348,8 +2518,7 @@ export function CitationTreeVisualization({
           // Convert canvas to PNG and download
           canvas.toBlob((blob) => {
             if (!blob) {
-              console.error('Failed to create blob from canvas')
-              alert('Failed to export graph as PNG. Please try again.')
+              toast.error('Failed to export graph', 'Could not create image file')
               URL.revokeObjectURL(url)
               return
             }
@@ -2378,9 +2547,8 @@ export function CitationTreeVisualization({
               URL.revokeObjectURL(url)
             }, 100)
           }, 'image/png', 1.0) // Maximum quality
-        } catch (error) {
-          console.error('Error drawing image to canvas:', error)
-          alert('Failed to export graph as PNG. Please try again.')
+        } catch (error: any) {
+          toast.error('Failed to export graph', error?.message || 'Could not draw image to canvas')
           URL.revokeObjectURL(url)
         }
       }
@@ -2392,9 +2560,8 @@ export function CitationTreeVisualization({
       }
 
       img.src = url
-    } catch (error) {
-      console.error('Error exporting graph as PNG:', error)
-      alert('Failed to export graph as PNG. Please try again.')
+    } catch (error: any) {
+      toast.error('Failed to export graph', error?.message || 'An unexpected error occurred')
     }
   }
 
@@ -2540,14 +2707,13 @@ export function CitationTreeVisualization({
               const currentNode = selectedNodeForMetadata
               
               if (!currentNode) {
-                console.error('No node selected')
-                alert('No node selected. Please select a node first.')
+                toast.warning('No node selected', 'Please select a node first')
                 return
               }
               
               // Verify the node matches what we expect
               if (currentNode.id !== nodeId) {
-                console.warn('Node ID mismatch. Dialog shows:', nodeId, 'but selectedNodeForMetadata is:', currentNode.id)
+                toast.warning('Node mismatch', 'Using different node than expected')
                 // Still proceed with currentNode to ensure we use the latest selection
               }
               
@@ -2698,7 +2864,45 @@ export function CitationTreeVisualization({
       {selectedNodeForMetadata?.paperId && (
         <KeywordSelectionPanel
           open={keywordPanelOpen}
-          onOpenChange={setKeywordPanelOpen}
+          onOpenChange={(open) => {
+            setKeywordPanelOpen(open)
+            // Clean up empty nodes if panel is closed without searching (only if no search is in progress)
+            if (!open && selectedNodeForMetadata && !searchInProgress) {
+              // Check if there are empty nodes that need cleanup
+              const hasEmptyNodes = Array.from(emptyNodes.keys()).length > 0
+              if (hasEmptyNodes) {
+                const removeEmptyNodesFromTree = (node: GraphNode | null): GraphNode | null => {
+                  if (!node) return null
+                  if (node.id === selectedNodeForMetadata.id) {
+                    // Filter out empty nodes from children
+                    const filteredChildren = (node.children || []).filter(child => {
+                      const isEmpty = child.label === 'New Node' || 
+                                     child.displayLabel === 'New Node' || 
+                                     child.id.startsWith('empty-') || 
+                                     emptyNodes.has(child.id)
+                      if (isEmpty) {
+                        setEmptyNodes(prev => {
+                          const next = new Map(prev)
+                          next.delete(child.id)
+                          return next
+                        })
+                      }
+                      return !isEmpty
+                    })
+                    return {
+                      ...node,
+                      children: filteredChildren,
+                    }
+                  }
+                  return {
+                    ...node,
+                    children: node.children?.map(removeEmptyNodesFromTree).filter(Boolean) as GraphNode[],
+                  }
+                }
+                setTreeData(prev => prev ? removeEmptyNodesFromTree(prev) : null)
+              }
+            }
+          }}
           corpusId={(() => {
             let paperId = selectedNodeForMetadata.paperId || selectedNodeForMetadata.paper?.id || ''
             return paperId.toString().replace('corpus:', '').replace('paper-', '').replace('root-', '').trim()

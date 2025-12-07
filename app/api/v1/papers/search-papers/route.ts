@@ -170,11 +170,11 @@ export async function POST(request: Request) {
     const hasPhrases = phrases && Array.isArray(phrases) && phrases.length > 0
     const hasQuery = query && typeof query === 'string' && query.trim().length > 0
     
-    // Validate phrases count (3-10 for keywordSearch/combinedSearch)
+    // Validate phrases count (1-2 for keywordSearch/combinedSearch - updated to match UI limit)
     if (hasPhrases) {
-      if (phrases.length < 3 || phrases.length > 10) {
+      if (phrases.length < 1 || phrases.length > 2) {
         return NextResponse.json(
-          { error: 'phrases must contain between 3 and 10 items for keywordSearch or combinedSearch' },
+          { error: 'phrases must contain between 1 and 2 items for keywordSearch or combinedSearch' },
           { status: 400 }
         )
       }
@@ -212,14 +212,51 @@ export async function POST(request: Request) {
       let jobType: 'keywordSearch' | 'querySearch' | 'combinedSearch' = 'querySearch'
       let jobBody: any = {}
 
+      // Pad phrases array if needed (Veritus API requires minimum 3 phrases)
+      // When user selects only 1-2 keywords, we pad with paper metadata from chatstore
+      let paddedPhrases = phrases ? [...phrases] : []
+      if (hasPhrases && paddedPhrases.length < 3 && chatId) {
+        try {
+          await connectDB()
+          const chat = await Chat.findOne({ _id: chatId, userId: user.userId })
+          if (chat?.chatMetadata?.paperData) {
+            const paperData = chat.chatMetadata.paperData
+            // Add paper title if not already in phrases
+            if (paperData.title && !paddedPhrases.some(p => p.toLowerCase() === paperData.title.toLowerCase())) {
+              paddedPhrases.push(paperData.title)
+            }
+            // Add fields of study if available
+            if (paperData.fieldsOfStudy && Array.isArray(paperData.fieldsOfStudy)) {
+              for (const field of paperData.fieldsOfStudy) {
+                if (paddedPhrases.length >= 3) break
+                if (field && !paddedPhrases.some(p => p.toLowerCase() === field.toLowerCase())) {
+                  paddedPhrases.push(field)
+                }
+              }
+            }
+            // Add publication type if available
+            if (paperData.publicationType && paddedPhrases.length < 3) {
+              if (!paddedPhrases.some(p => p.toLowerCase() === paperData.publicationType.toLowerCase())) {
+                paddedPhrases.push(paperData.publicationType)
+              }
+            }
+          }
+        } catch (error) {
+          // If we can't get paper data, we'll let the API validation handle it
+        }
+      }
+      
+      // If still less than 3 after padding, the API will reject it
+      // But we've already validated 1-2 in our validation, so this should be rare
+
       if (hasPhrases && hasQuery) {
         // Both phrases and query provided -> combinedSearch
         jobType = 'combinedSearch'
-        jobBody = { phrases, query: query.trim() }
+        jobBody = { phrases: paddedPhrases, query: query.trim() }
       } else if (hasPhrases) {
         // Only phrases provided -> keywordSearch
         jobType = 'keywordSearch'
-        jobBody = { phrases }
+        jobBody = { phrases: paddedPhrases }
       } else if (hasQuery) {
         // Only query provided -> querySearch
         jobType = 'querySearch'
@@ -245,13 +282,16 @@ export async function POST(request: Request) {
       const jobResponse = await createJob(jobParams, jobBody, { apiKey })
       const jobId = jobResponse.jobId
 
-      // Poll for job completion (simple polling, can be improved)
+      // Poll for job completion
+      // For mock mode: 3 second timeout, for real API: 60 second timeout (default)
+      const isMock = jobId.startsWith('mock-job-') || process.env.DEBUG === 'true'
       let attempts = 0
-      const maxAttempts = 30
+      const maxAttempts = isMock ? 2 : 30 // Mock: 2 attempts * 1.5s ≈ 3s, Real: 30 attempts * 2s = 60s
+      const pollInterval = isMock ? 1500 : 2000 // Mock: 1.5s, Real: 2s
       let jobStatus
 
       while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 2000)) // Wait 2 seconds
+        await new Promise(resolve => setTimeout(resolve, pollInterval))
         jobStatus = await getJobStatus(jobId, { apiKey })
         
         if (jobStatus.status === 'success') {
@@ -264,11 +304,27 @@ export async function POST(request: Request) {
         attempts++
       }
 
+      // Check if we timed out or got results
       if (!papers || papers.length === 0) {
-        return NextResponse.json(
-          { error: 'Search timed out or returned no results' },
-          { status: 504 }
-        )
+        if (isMock) {
+          return NextResponse.json(
+            { error: 'Search timed out or returned no results' },
+            { status: 504 }
+          )
+        } else {
+          // For real API, check final status
+          const finalStatus = await getJobStatus(jobId, { apiKey })
+          if (finalStatus.status === 'queued' || finalStatus.status === 'processing') {
+            return NextResponse.json(
+              { error: 'Search timed out after 60 seconds. The job is still processing. Please try again later.' },
+              { status: 504 }
+            )
+          }
+          return NextResponse.json(
+            { error: 'Search timed out after 60 seconds or returned no results' },
+            { status: 504 }
+          )
+        }
       }
     }
 
