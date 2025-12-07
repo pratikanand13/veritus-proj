@@ -107,10 +107,10 @@ function createPaperNode(
   const year = paper.year || null
   const authors = paper.authors || null
 
-  const paperData = {
+  const paperData: Paper & { sourcePaperId: string } = {
     ...paper,
     sourcePaperId: paper.id, // Track which paper this node came from
-  } as Paper & { sourcePaperId: string }
+  }
 
   return {
     primaryKey: paper.id,

@@ -119,8 +119,14 @@ export function clusterByType(nodes: CitationNetworkNode[]): Cluster[] {
 export function calculateClusterBounds(cluster: Cluster): Cluster {
   if (cluster.nodes.length === 0) return cluster
   
-  const xs = cluster.nodes.map(n => n.x || 0)
-  const ys = cluster.nodes.map(n => n.y || 0)
+  const xs = cluster.nodes.map(n => {
+    const nodeWithProps = n as CitationNetworkNode & { x?: number; y?: number }
+    return nodeWithProps.x || 0
+  })
+  const ys = cluster.nodes.map(n => {
+    const nodeWithProps = n as CitationNetworkNode & { y?: number }
+    return nodeWithProps.y || 0
+  })
   
   const minX = Math.min(...xs)
   const maxX = Math.max(...xs)
