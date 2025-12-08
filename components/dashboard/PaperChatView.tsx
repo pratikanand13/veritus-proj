@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, ReactNode } from 'react'
+import { useState, useEffect, useRef, ReactNode } from 'react'
 import { ExternalLink, FileText, GitBranch, Network, Search, Loader2, ShieldCheck, Sparkles, Bookmark, BookmarkCheck, X, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -120,6 +120,7 @@ export function PaperChatView({
   const [hasSearchResults, setHasSearchResults] = useState(false)
   const [loadingSearch, setLoadingSearch] = useState(false)
   const [loadingCitationNetwork, setLoadingCitationNetwork] = useState(false)
+  const [loadingPaperData, setLoadingPaperData] = useState(false) // Track loading state for paper data
   const [showKeywordSelectionPanel, setShowKeywordSelectionPanel] = useState(false)
   const [showCitationNetworkModal, setShowCitationNetworkModal] = useState(false)
   const [citationNetworkResponse, setCitationNetworkResponse] = useState<CitationNetworkResponse | null>(null)
@@ -128,6 +129,7 @@ export function PaperChatView({
   const [isBookmarking, setIsBookmarking] = useState(false)
   const [isCopied, setIsCopied] = useState(false)
   const [bookmarks, setBookmarks] = useState<any[]>([])
+  const previousChatIdRef = useRef<string | null>(null) // Track previous chatId to detect changes
 
   const fetchBookmarks = async (paperId?: string) => {
     try {
@@ -202,37 +204,104 @@ export function PaperChatView({
   }
 
   useEffect(() => {
-    // Reset all state when chatId changes to ensure clean state for new chats
-    setSearchResults([])
-    setHasSearchResults(false)
-    setCitationNetworkResponse(null)
-    setLoadingSearch(false)
-    setLoadingCitationNetwork(false)
+    // Detect if chatId actually changed (not just initial mount)
+    const chatIdChanged = previousChatIdRef.current !== null && previousChatIdRef.current !== chatId
+    previousChatIdRef.current = chatId
     
-    // Load chat data to get paperData only (initial paper from which chat started)
+    if (!chatId) {
+      // Clear state only if chatId is null
+      setPaperData(null)
+      setSearchResults([])
+      setHasSearchResults(false)
+      setCitationNetworkResponse(null)
+      setMessages([])
+      setLoadingPaperData(false)
+      return
+    }
+    
+    // Only clear search-related state when chatId changes (not paperData yet)
+    // We'll clear paperData only after we confirm the new chat doesn't have it
+    if (chatIdChanged) {
+      setSearchResults([])
+      setHasSearchResults(false)
+      setCitationNetworkResponse(null)
+      setLoadingSearch(false)
+      setLoadingCitationNetwork(false)
+      setIsBookmarked(false)
+    }
+    
+    // Set loading state to prevent showing "No Paper Data" while loading
+    setLoadingPaperData(true)
+    
+    // Load chat data and read from chatStore as single source of truth
     const loadChatData = async () => {
       try {
         const response = await fetch(`/api/chats/${chatId}`)
         if (response.ok) {
           const data = await response.json()
+          const chat = data.chat
           
-          // Only load the initial paperData from chatMetadata (the paper that started this chat)
-          if (data.chat?.chatMetadata?.paperData) {
-            setPaperData(data.chat.chatMetadata.paperData)
+          // CRITICAL: Read paper data - prioritize paperData, then chatStore
+          // paperData is the most reliable source for the current chat's paper
+          let currentPaper: any = null
+          
+          // PRIORITY 1: Use paperData from chatMetadata (most reliable for new chats)
+          // This is always set when a chat is created with a paper
+          if (chat?.chatMetadata?.paperData) {
+            currentPaper = chat.chatMetadata.paperData
             
-            // Fetch bookmarks to check if paper is bookmarked
-            fetchBookmarks(data.chat.chatMetadata.paperData.id)
+            // If chatStore exists, try to get the enhanced version with API response
+            // This gives us the most complete paper data with full API responses
+            if (chat?.chatMetadata?.chatStore) {
+              const chatStore = chat.chatMetadata.chatStore
+              const heading = currentPaper.abstract || currentPaper.title
+              
+              // Try exact match first
+              if (heading && chatStore[heading]) {
+                // Use paper from chatStore entry (has latest API response)
+                currentPaper = chatStore[heading].paper
+              } else {
+                // Try to find by paper ID if heading doesn't match
+                const chatStoreEntries = Object.values(chatStore) as any[]
+                const matchingEntry = chatStoreEntries.find(
+                  (entry: any) => entry.paper?.id === currentPaper.id
+                )
+                if (matchingEntry) {
+                  currentPaper = matchingEntry.paper
+                }
+              }
+            }
           }
+          // PRIORITY 2: If no paperData, try chatStore (for edge cases)
+          else if (chat?.chatMetadata?.chatStore) {
+            const chatStore = chat.chatMetadata.chatStore
+            const chatStoreEntries = Object.values(chatStore)
+            if (chatStoreEntries.length > 0) {
+              currentPaper = (chatStoreEntries[0] as any).paper
+            }
+          }
+          
+          // Set the current paper data (only clear if we confirmed there's no paper)
+          if (currentPaper) {
+            setPaperData(currentPaper)
+            fetchBookmarks(currentPaper.id)
+          } else {
+            // Only clear paperData if we confirmed this chat has no paper
+            // This prevents clearing while loading
+            setPaperData(null)
+          }
+          
+          setLoadingPaperData(false)
           
           // Load messages but don't auto-populate search results
           // Search results should only appear after user clicks "Search Papers"
-          if (data.chat?.messages) {
-            setMessages(data.chat.messages)
+          if (chat?.messages) {
+            setMessages(chat.messages)
             
             // IMPORTANT: For new chats created from nodes, we should NOT show search results
             // Only show search results if they were explicitly added via search-papers API
             // AND the message content clearly indicates it's from a search (not initial paper)
-            const searchResultMessages = data.chat.messages.filter((msg: any) => {
+            const searchResultMessages = chat.messages.filter((msg: any) => {
               // Must have papers array
               if (!msg.papers || !Array.isArray(msg.papers) || msg.papers.length === 0) {
                 return false
@@ -276,13 +345,19 @@ export function PaperChatView({
         }
       } catch (error) {
         console.error('Error loading chat data:', error)
-        // On error, ensure clean state
+        // On error, only clear if we're sure there's no data
+        // Don't clear paperData if it might still be valid
+        setLoadingPaperData(false)
         setSearchResults([])
         setHasSearchResults(false)
+        // Only clear paperData if chatId changed (not on initial load error)
+        if (chatIdChanged) {
+          setPaperData(null)
+        }
       }
     }
     loadChatData()
-  }, [chatId])
+  }, [chatId]) // Only depend on chatId - this ensures complete reset on chat change
 
   const handleSearchSimilarPapers = async (params: {
     corpusId: string
@@ -632,6 +707,20 @@ export function PaperChatView({
     }
   }
 
+  // Show loading state while fetching paper data (don't show "No Paper Data" prematurely)
+  if (loadingPaperData) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-6">
+        <Loader2 className="h-16 w-16 text-muted-foreground mb-4 animate-spin" />
+        <h2 className="text-2xl font-semibold text-foreground mb-2">Loading Paper Data...</h2>
+        <p className="text-muted-foreground mb-6 text-center max-w-md">
+          Fetching paper information for this chat...
+        </p>
+      </div>
+    )
+  }
+  
+  // Only show "No Paper Data" if we've finished loading and confirmed there's no data
   if (!paperData) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6">

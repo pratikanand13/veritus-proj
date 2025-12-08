@@ -258,49 +258,12 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
     // Create or select a chat for this paper
     if (onSelectChat && projectId) {
       try {
-        // Create a new chat with paper title and paper data
-        const chatTitle = paper.title.length > 50 ? paper.title.substring(0, 50) + '...' : paper.title
-        const chatResponse = await fetch('/api/chats', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            projectId,
-            title: chatTitle,
-            paperData: {
-              id: paper.id,
-              title: paper.title,
-              authors: paper.authors,
-              year: paper.year,
-              journalName: paper.journalName,
-              abstract: paper.abstract,
-              tldr: paper.tldr,
-              citationCount: paper.impactFactor?.citationCount,
-              pdfLink: paper.pdfLink,
-              fieldsOfStudy: paper.fieldsOfStudy,
-              publicationType: paper.publicationType,
-            },
-            messages: [{
-              role: 'assistant',
-              content: `Paper: ${paper.title}\n\nAuthors: ${paper.authors || 'N/A'}\nYear: ${paper.year || 'N/A'}\nJournal: ${paper.journalName || 'N/A'}\n\n${paper.abstract ? `Abstract: ${paper.abstract}` : ''}\n\n${paper.tldr ? `TLDR: ${paper.tldr}` : ''}`,
-              timestamp: new Date(),
-            }],
-          }),
-        })
-        
-        if (!chatResponse.ok) {
-          throw new Error('Failed to create chat')
-        }
-
-        const chatData = await chatResponse.json()
-        const newChatId = chatData.chat.id
-        onSelectChat(newChatId)
-
-        // Call search API with corpusId if present, otherwise with title
+        // FIRST: Fetch the full paper data from API before creating the chat
+        // This ensures the chat is created with complete paper data from the start
         let searchResponse: Response
         if (paper.id && paper.id.startsWith('corpus:')) {
           // Use corpusId
           const corpusUrl = new URL(`/api/v1/papers/${paper.id}`, window.location.origin)
-          corpusUrl.searchParams.set('chatId', newChatId)
           if (useMock) {
             corpusUrl.searchParams.set('mock', 'true')
           }
@@ -312,7 +275,6 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
           // Use title
           const searchUrl = new URL('/api/v1/papers/search', window.location.origin)
           searchUrl.searchParams.set('title', paper.title)
-          searchUrl.searchParams.set('chatId', newChatId)
           if (useMock) {
             searchUrl.searchParams.set('mock', 'true')
           }
@@ -329,13 +291,54 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
         }
 
         const searchData: SearchPaperResponse = await searchResponse.json()
+        const fullPaperData = searchData.paper
+
+        // NOW: Create the chat with the complete paper data from API
+        const chatTitle = fullPaperData.title.length > 50 ? fullPaperData.title.substring(0, 50) + '...' : fullPaperData.title
+        const chatResponse = await fetch('/api/chats', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId,
+            title: chatTitle,
+            paperData: fullPaperData, // Use the complete paper data from API
+            messages: [{
+              role: 'assistant',
+              content: `Paper: ${fullPaperData.title}\n\nAuthors: ${fullPaperData.authors || 'N/A'}\nYear: ${fullPaperData.year || 'N/A'}\nJournal: ${fullPaperData.journalName || 'N/A'}\n\n${fullPaperData.abstract ? `Abstract: ${fullPaperData.abstract}` : ''}\n\n${fullPaperData.tldr ? `TLDR: ${fullPaperData.tldr}` : ''}`,
+              timestamp: new Date(),
+            }],
+          }),
+        })
         
+        if (!chatResponse.ok) {
+          throw new Error('Failed to create chat')
+        }
+
+        const chatData = await chatResponse.json()
+        const newChatId = chatData.chat.id
+
+        // Update chat metadata with chatId for proper tracking (this also updates metadata fields)
+        // This ensures the paper is properly associated with this chat in the metadata
+        if (fullPaperData.id) {
+          const metadataUrl = new URL(`/api/v1/papers/${fullPaperData.id}`, window.location.origin)
+          metadataUrl.searchParams.set('chatId', newChatId)
+          if (useMock) {
+            metadataUrl.searchParams.set('mock', 'true')
+          }
+          await fetch(metadataUrl.toString(), {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          }).catch(() => {
+            // Ignore errors, metadata update is optional
+          })
+        }
+
         // Add search result as assistant message
         const searchMessage = {
           role: 'assistant' as const,
-          content: `Found paper: ${searchData.paper.title}\n\nAuthors: ${searchData.paper.authors}\nYear: ${searchData.paper.year || 'N/A'}\nCitations: ${searchData.paper.impactFactor?.citationCount || 0}\n\n${searchData.paper.abstract || searchData.paper.tldr || ''}`,
+          content: `Found paper: ${fullPaperData.title}\n\nAuthors: ${fullPaperData.authors}\nYear: ${fullPaperData.year || 'N/A'}\nCitations: ${fullPaperData.impactFactor?.citationCount || 0}\n\n${fullPaperData.abstract || fullPaperData.tldr || ''}`,
           timestamp: new Date(),
-          papers: [searchData.paper],
+          papers: [fullPaperData],
         }
 
         await fetch(`/api/chats/${newChatId}`, {
@@ -346,14 +349,53 @@ export function PaperSearchPage({ chatId, onSelectChat, projectId, chatDepth = 1
           }),
         })
 
+        // Verify chat was created with paperData before switching
+        // This ensures the chat has the correct data when PaperChatView loads
+        try {
+          const verifyResponse = await fetch(`/api/chats/${newChatId}`)
+          if (verifyResponse.ok) {
+            const verifyData = await verifyResponse.json()
+            // Ensure paperData is set in chatMetadata
+            if (!verifyData.chat?.chatMetadata?.paperData) {
+              // If paperData is missing, update it (preserve existing chatStore)
+              const existingMetadata = verifyData.chat?.chatMetadata || {}
+              await fetch(`/api/chats/${newChatId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chatMetadata: {
+                    ...existingMetadata,
+                    paperData: fullPaperData,
+                    // Ensure chatStore is initialized if it doesn't exist
+                    chatStore: existingMetadata.chatStore || {
+                      [fullPaperData.abstract || fullPaperData.title]: {
+                        heading: fullPaperData.abstract || fullPaperData.title,
+                        paper: fullPaperData,
+                        similarPapers: [],
+                        apiResponse: { paper: fullPaperData },
+                      },
+                    },
+                  },
+                }),
+              })
+            }
+          }
+        } catch (error) {
+          console.error('Error verifying chat data:', error)
+          // Continue anyway - the chat should have paperData from creation
+        }
+
+        // NOW switch to the chat - it already has the correct paperData from the start
+        onSelectChat(newChatId)
+
         // Automatically call corpus API after search succeeds
-        if (searchData.paper?.id) {
+        if (fullPaperData?.id) {
           try {
             const corpusResponse = await fetch('/api/paper/corpus', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                corpusId: searchData.paper.id,
+                corpusId: fullPaperData.id,
                 depth: chatDepth,
                 chatId: newChatId,
                 isMocked: useMock,

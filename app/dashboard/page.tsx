@@ -379,8 +379,7 @@ export default function DashboardPage() {
     }
   }
 
-  // Instant chat creation from heading click - no metadata, no API calls
-  // Just creates a chat with the title and opens it immediately
+  // Create chat from heading click - fetches full paper data from API before creating chat
   const handleCreateChatFromHeading = async (titleOrPaper: string | VeritusPaper): Promise<string | null> => {
     // Get projectId for chat creation
     let projectId = selectedProject
@@ -409,30 +408,70 @@ export default function DashboardPage() {
     const chatTitle = title.length > 50 ? title.substring(0, 50) + '...' : title
 
     try {
-      // If we have paper data, create chat with paperData and initial message
-      // Otherwise, create empty chat (for backward compatibility)
+      let fullPaperData: VeritusPaper | null = null
+
+      // If we have a paper object, fetch the complete paper data from API
+      // This ensures we have all paper-api details (abstract, TLDR, metadata, etc.)
+      if (paper) {
+        try {
+          let searchResponse: Response | null = null
+          
+          // Try to fetch by corpus ID first if available
+          if (paper.id && paper.id.startsWith('corpus:')) {
+            const corpusUrl = new URL(`/api/v1/papers/${paper.id}`, window.location.origin)
+            if (useMock) {
+              corpusUrl.searchParams.set('mock', 'true')
+            }
+            searchResponse = await fetch(corpusUrl.toString(), {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' },
+            })
+          } 
+          // Otherwise, fetch by title
+          else if (paper.title) {
+            const searchUrl = new URL('/api/v1/papers/search', window.location.origin)
+            searchUrl.searchParams.set('title', paper.title)
+            if (useMock) {
+              searchUrl.searchParams.set('mock', 'true')
+            }
+            searchResponse = await fetch(searchUrl.toString(), {
+              method: 'GET',
+              headers: { 'Content-Type': 'application/json' },
+            })
+          }
+
+          // If we made an API call and it succeeded, parse the response
+          if (searchResponse && searchResponse.ok) {
+            const searchData = await searchResponse.json()
+            fullPaperData = searchData.paper
+          } else {
+            // If no API call was made or it failed, use the paper object as fallback
+            fullPaperData = paper
+          }
+        } catch (error) {
+          console.error('Error fetching paper data:', error)
+          // Use the paper object as fallback if API call fails
+          fullPaperData = paper
+        }
+      }
+
+      // Create chat with paperData and initial message
       const requestBody: any = {
         projectId,
         title: chatTitle,
       }
 
-      if (paper) {
-        // Create chat with paperData in chatMetadata and initial message
-        const cleanPaperData = {
-          ...paper,
-        }
-
+      if (fullPaperData) {
+        // Create chat with complete paperData in chatMetadata and initial message
         const rootMessage: any = {
           role: 'assistant' as const,
-          content: `Paper: ${title}\n\nAuthors: ${paper.authors || 'N/A'}\nYear: ${paper.year || 'N/A'}\nJournal: ${paper.journalName || 'N/A'}\n\n${paper.abstract ? `Abstract: ${paper.abstract}` : ''}\n\n${paper.tldr ? `TLDR: ${paper.tldr}` : ''}`,
+          content: `Paper: ${fullPaperData.title}\n\nAuthors: ${fullPaperData.authors || 'N/A'}\nYear: ${fullPaperData.year || 'N/A'}\nJournal: ${fullPaperData.journalName || 'N/A'}\n\n${fullPaperData.abstract ? `Abstract: ${fullPaperData.abstract}` : ''}\n\n${fullPaperData.tldr ? `TLDR: ${fullPaperData.tldr}` : ''}`,
           timestamp: new Date(),
-          papers: [cleanPaperData],
+          papers: [fullPaperData],
         }
 
         requestBody.messages = [rootMessage]
-        requestBody.chatMetadata = {
-          paperData: cleanPaperData,
-        }
+        requestBody.paperData = fullPaperData // Pass paperData to create chatStore
       }
 
       const response = await fetch('/api/chats', {
@@ -461,6 +500,43 @@ export default function DashboardPage() {
         return null
       }
 
+      // Verify chat was created with paperData and update metadata if needed
+      if (fullPaperData) {
+        try {
+          const verifyResponse = await fetch(`/api/chats/${newChatId}`)
+          if (verifyResponse.ok) {
+            const verifyData = await verifyResponse.json()
+            // Ensure paperData is set in chatMetadata
+            if (!verifyData.chat?.chatMetadata?.paperData) {
+              // If paperData is missing, update it (preserve existing chatStore)
+              const existingMetadata = verifyData.chat?.chatMetadata || {}
+              await fetch(`/api/chats/${newChatId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chatMetadata: {
+                    ...existingMetadata,
+                    paperData: fullPaperData,
+                    // Ensure chatStore is initialized if it doesn't exist
+                    chatStore: existingMetadata.chatStore || {
+                      [fullPaperData.abstract || fullPaperData.title]: {
+                        heading: fullPaperData.abstract || fullPaperData.title,
+                        paper: fullPaperData,
+                        similarPapers: [],
+                        apiResponse: { paper: fullPaperData },
+                      },
+                    },
+                  },
+                }),
+              })
+            }
+          }
+        } catch (error) {
+          console.error('Error verifying chat data:', error)
+          // Continue anyway - the chat should have paperData from creation
+        }
+      }
+
       // Optimistically add the new chat to state immediately for instant sidebar update
       const newChat: Chat = {
         id: newChatId,
@@ -483,7 +559,7 @@ export default function DashboardPage() {
         return [newChat, ...prevChats]
       })
 
-      // Switch to new chat immediately
+      // Switch to new chat immediately - it already has the correct paperData
       setSelectedChat(newChatId)
 
       // Refresh chats list from server in background to ensure consistency
