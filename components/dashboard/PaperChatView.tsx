@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, ReactNode } from 'react'
-import { ExternalLink, FileText, GitBranch, Network, Search, Loader2, ShieldCheck, Sparkles, Bookmark, BookmarkCheck, X } from 'lucide-react'
+import { ExternalLink, FileText, GitBranch, Network, Search, Loader2, ShieldCheck, Sparkles, Bookmark, BookmarkCheck, X, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -126,6 +126,7 @@ export function PaperChatView({
   const [messages, setMessages] = useState<any[]>([])
   const [isBookmarked, setIsBookmarked] = useState(false)
   const [isBookmarking, setIsBookmarking] = useState(false)
+  const [isCopied, setIsCopied] = useState(false)
   const [bookmarks, setBookmarks] = useState<any[]>([])
 
   const fetchBookmarks = async (paperId?: string) => {
@@ -140,6 +141,26 @@ export function PaperChatView({
       }
     } catch (error) {
       console.error('Error fetching bookmarks:', error)
+    }
+  }
+
+  const handleCopyPaperData = async () => {
+    if (!paperData) return
+    
+    try {
+      // Format paper data as JSON string
+      const paperDataString = JSON.stringify(paperData, null, 2)
+      await navigator.clipboard.writeText(paperDataString)
+      setIsCopied(true)
+      toast.success('Paper data copied to clipboard')
+      
+      // Reset copy state after 2 seconds
+      setTimeout(() => {
+        setIsCopied(false)
+      }, 2000)
+    } catch (error) {
+      console.error('Failed to copy paper data:', error)
+      toast.error('Failed to copy paper data')
     }
   }
 
@@ -645,27 +666,48 @@ export function PaperChatView({
           <section className="space-y-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold uppercase tracking-[0.1em] text-muted-foreground">Title</p>
-              <Button
-                onClick={handleBookmark}
-                disabled={isBookmarking}
-                variant="outline"
-                size="sm"
-                className="rounded-full border-border bg-card text-card-foreground hover:bg-accent"
-              >
-                {isBookmarking ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : isBookmarked ? (
-                  <>
-                    <BookmarkCheck className="h-4 w-4 mr-2" />
-                    Bookmarked
-                  </>
-                ) : (
-                  <>
-                    <Bookmark className="h-4 w-4 mr-2" />
-                    Bookmark
-                  </>
-                )}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleCopyPaperData}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-border bg-card text-card-foreground hover:bg-accent"
+                  title="Copy paper data"
+                >
+                  {isCopied ? (
+                    <>
+                      <Check className="h-4 w-4 mr-2" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={handleBookmark}
+                  disabled={isBookmarking}
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full border-border bg-card text-card-foreground hover:bg-accent"
+                >
+                  {isBookmarking ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : isBookmarked ? (
+                    <>
+                      <BookmarkCheck className="h-4 w-4 mr-2" />
+                      Bookmarked
+                    </>
+                  ) : (
+                    <>
+                      <Bookmark className="h-4 w-4 mr-2" />
+                      Bookmark
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
             <div className="flex flex-col gap-2">
               <h1 
