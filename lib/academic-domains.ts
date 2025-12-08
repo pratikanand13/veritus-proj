@@ -20,7 +20,7 @@ const ACADEMIC_KEYWORDS = [
   'cs', 'comp', 'engg', 'bio', 'physics',
 ]
 
-const RESEARCH_COMPANY_TERMS = ['research', 'lab', 'ai', 'ml', 'bio', 'quantum']
+const RESEARCH_COMPANY_TERMS = ['research', 'lab', 'ai', 'ml', 'bio', 'quantum', 'veritus']
 
 const FREE_PROVIDERS = [
   'gmail.com',
