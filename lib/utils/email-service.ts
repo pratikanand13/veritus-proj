@@ -300,6 +300,171 @@ You're receiving this email because you have daily email notifications enabled f
 }
 
 /**
+ * Send OTP email for signup verification
+ * In development mode without SMTP, logs OTP to console instead
+ */
+export async function sendOTPEmail(
+  userEmail: string,
+  otp: string
+): Promise<void> {
+  // Check if SMTP is configured
+  const smtpUser = process.env.SMTP_USER?.trim()
+  const smtpPassword = process.env.SMTP_PASSWORD?.trim()
+  const smtpHost = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com'
+  const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10)
+  const smtpSecure = process.env.SMTP_SECURE === 'true'
+  
+  // Debug logging to check what's being read
+  console.log('\n=== SMTP Configuration Check ===')
+  console.log('SMTP_USER exists:', !!process.env.SMTP_USER)
+  console.log('SMTP_USER value (first 3 chars):', process.env.SMTP_USER ? process.env.SMTP_USER.substring(0, 3) + '...' : 'undefined')
+  console.log('SMTP_USER length:', process.env.SMTP_USER?.length || 0)
+  console.log('SMTP_PASSWORD exists:', !!process.env.SMTP_PASSWORD)
+  console.log('SMTP_PASSWORD length:', process.env.SMTP_PASSWORD?.length || 0)
+  console.log('SMTP_HOST:', smtpHost)
+  console.log('SMTP_PORT:', smtpPort)
+  console.log('SMTP_SECURE:', smtpSecure)
+  console.log('All SMTP env vars found:', Object.keys(process.env).filter(key => key.includes('SMTP')))
+  console.log('NODE_ENV:', process.env.NODE_ENV)
+  console.log('================================\n')
+  
+  // If SMTP not configured, log OTP in development mode
+  if (!smtpUser || !smtpPassword) {
+    if (process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true') {
+      console.log('\n' + '='.repeat(60))
+      console.log('📧 OTP EMAIL (Development Mode - SMTP not configured)')
+      console.log('='.repeat(60))
+      console.log(`To: ${userEmail}`)
+      console.log(`Subject: Your Verification Code`)
+      console.log(`\nYour verification code is: ${otp}`)
+      console.log(`\nThis code expires in 10 minutes.`)
+      console.log('='.repeat(60) + '\n')
+      return // Don't throw error in dev mode
+    } else {
+      // In production, throw error if SMTP not configured
+      throw new Error('SMTP credentials not configured. Cannot send OTP email.')
+    }
+  }
+
+  // Create transporter with explicit configuration
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpSecure, // true for 465, false for other ports
+    auth: {
+      user: smtpUser,
+      pass: smtpPassword,
+    },
+    // Add debug option in development
+    debug: process.env.NODE_ENV === 'development',
+    logger: process.env.NODE_ENV === 'development',
+  })
+
+  // Verify transporter configuration
+  try {
+    await transporter.verify()
+    console.log('SMTP server is ready to send emails')
+  } catch (verifyError) {
+    console.error('SMTP verification failed:', verifyError)
+    throw new Error(`SMTP configuration error: ${verifyError instanceof Error ? verifyError.message : 'Unknown error'}`)
+  }
+
+  const emailHtml = generateOTPEmailTemplate(otp)
+  const emailText = generateOTPEmailText(otp)
+
+  try {
+    const mailOptions = {
+      from: `"Research Paper Platform" <${smtpUser}>`,
+      to: userEmail,
+      subject: 'Your Verification Code',
+      html: emailHtml,
+      text: emailText,
+    }
+
+    console.log(`Attempting to send OTP email to ${userEmail} via ${smtpHost}:${smtpPort}`)
+    
+    const info = await transporter.sendMail(mailOptions)
+    
+    console.log(`OTP email sent successfully to ${userEmail}`)
+    console.log('Message ID:', info.messageId)
+  } catch (error: any) {
+    console.error(`Failed to send OTP email to ${userEmail}:`, error)
+    
+    // Provide more helpful error messages
+    if (error.code === 'EAUTH') {
+      throw new Error('SMTP authentication failed. Please check your SMTP_USER and SMTP_PASSWORD.')
+    } else if (error.code === 'ECONNECTION') {
+      throw new Error(`Could not connect to SMTP server ${smtpHost}:${smtpPort}. Please check SMTP_HOST and SMTP_PORT.`)
+    } else if (error.code === 'ETIMEDOUT') {
+      throw new Error('SMTP connection timed out. Please check your network connection and SMTP settings.')
+    }
+    
+    throw error
+  }
+}
+
+/**
+ * Generate HTML email template for OTP
+ */
+function generateOTPEmailTemplate(otp: string): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verification Code</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #0f0f0f; color: #ffffff; margin: 0; padding: 0;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <div style="background-color: #1a1a1a; border-radius: 12px; padding: 30px; border: 1px solid #2a2a2a;">
+      <h1 style="color: #ffffff; margin-top: 0; margin-bottom: 10px; font-size: 24px;">
+        🔐 Verification Code
+      </h1>
+      <p style="color: #9ca3af; margin: 10px 0 30px 0; font-size: 14px;">
+        Please use the following code to complete your signup:
+      </p>
+      
+      <div style="margin: 30px 0; padding: 20px; background-color: #1a1a1a; border-radius: 8px; border: 2px solid #3b82f6; text-align: center;">
+        <div style="font-size: 32px; font-weight: bold; color: #3b82f6; letter-spacing: 8px; font-family: monospace;">
+          ${otp}
+        </div>
+      </div>
+      
+      <p style="color: #d1d5db; margin: 20px 0; line-height: 1.6;">
+        This code will expire in 10 minutes. If you didn't request this code, please ignore this email.
+      </p>
+      
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a;">
+        <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+          This is an automated email. Please do not reply.
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+  `
+}
+
+/**
+ * Generate plain text email for OTP
+ */
+function generateOTPEmailText(otp: string): string {
+  return `
+Verification Code
+
+Please use the following code to complete your signup:
+
+${otp}
+
+This code will expire in 10 minutes. If you didn't request this code, please ignore this email.
+
+This is an automated email. Please do not reply.
+  `.trim()
+}
+
+/**
  * Escape HTML to prevent XSS
  */
 function escapeHtml(text: string): string {
