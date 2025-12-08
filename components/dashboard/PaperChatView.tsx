@@ -44,19 +44,19 @@ const formatValue = (value: unknown) => {
 
 const MetaItem = ({ label, value, fullSpan = false }: { label: string; value: ReactNode; fullSpan?: boolean }) => (
   <div
-    className={`rounded-xl border border-white/10 bg-white/5 p-4 shadow-sm ${
+    className={`rounded-xl border border-border bg-card/50 p-4 shadow-sm ${
       fullSpan ? 'md:col-span-2' : ''
     }`}
   >
-    <p className="text-[11px] uppercase tracking-[0.1em] text-slate-400">{label}</p>
-    <div className="mt-1 text-sm text-slate-50 break-words">{value}</div>
+    <p className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">{label}</p>
+    <div className="mt-1 text-sm text-card-foreground break-words">{value}</div>
   </div>
 )
 
 const ImpactItem = ({ label, value }: { label: string; value: ReactNode }) => (
-  <div className="rounded-xl border border-white/10 bg-white/5 p-4 shadow-sm">
-    <p className="text-[11px] uppercase tracking-[0.1em] text-slate-400">{label}</p>
-    <p className="mt-1 text-base font-semibold text-white">{value}</p>
+  <div className="rounded-xl border border-border bg-card/50 p-4 shadow-sm">
+    <p className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground">{label}</p>
+    <p className="mt-1 text-base font-semibold text-card-foreground">{value}</p>
   </div>
 )
 
@@ -76,14 +76,14 @@ const AccessCard = ({
   const isDisabled = !available
 
   return (
-    <div className="flex h-full flex-col gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5 shadow-sm">
+    <div className="flex h-full flex-col gap-3 rounded-2xl border border-border bg-card p-4 md:p-5 shadow-sm">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-card-foreground">
           {icon}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white">{label}</p>
-          <p className="text-xs text-slate-400 break-all">{available && href ? href : 'Not available'}</p>
+          <p className="text-sm font-semibold text-card-foreground">{label}</p>
+          <p className="text-xs text-muted-foreground break-all">{available && href ? href : 'Not available'}</p>
         </div>
       </div>
       <div className="mt-auto flex items-center justify-start gap-2">
@@ -639,18 +639,18 @@ export function PaperChatView({
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Left Section - Structured Paper Details */}
-      <div className="w-1/2 border-r border-white/10 overflow-y-auto bg-[#0c0f14] text-slate-50">
+      <div className="w-1/2 border-r border-border overflow-y-auto bg-background text-foreground">
         <div className="p-6 space-y-7">
           {/* Title Section */}
-          <section className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-6 shadow-sm">
+          <section className="space-y-3 rounded-2xl border border-border bg-card p-6 shadow-sm">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold uppercase tracking-[0.1em] text-slate-300">Title</p>
+              <p className="text-sm font-semibold uppercase tracking-[0.1em] text-muted-foreground">Title</p>
               <Button
                 onClick={handleBookmark}
                 disabled={isBookmarking}
                 variant="outline"
                 size="sm"
-                className="rounded-full border-white/20 bg-white/5 text-white hover:bg-white/10"
+                className="rounded-full border-border bg-card text-card-foreground hover:bg-accent"
               >
                 {isBookmarking ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -669,7 +669,7 @@ export function PaperChatView({
             </div>
             <div className="flex flex-col gap-2">
               <h1 
-                className="text-3xl font-semibold leading-tight text-white cursor-pointer hover:text-[#22c55e] transition-colors"
+                className="text-3xl font-semibold leading-tight text-card-foreground cursor-pointer hover:text-primary transition-colors"
                 onClick={() => {
                   if (onCreateChatFromHeading && paperData) {
                     // Pass the full paperData object so chat can be created with paperData
@@ -680,34 +680,34 @@ export function PaperChatView({
               >
                 {paperData.title}
               </h1>
-              <p className="text-base text-slate-200">{formatValue(paperData.authors)}</p>
-              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
+              <p className="text-base text-muted-foreground">{formatValue(paperData.authors)}</p>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                 <span>{formatValue(paperData.year)}</span>
-                <span className="text-slate-600">•</span>
+                <span className="text-muted-foreground/50">•</span>
                 <span>{paperData.journalName || paperData.v_journal_name || 'Not available'}</span>
               </div>
               <div className="flex flex-wrap items-center gap-2 pt-2">
-                <Badge variant="outline" className="border-white/20 bg-white/5 text-slate-100">
+                <Badge variant="outline" className="border-border bg-card/50 text-card-foreground">
                   ID: {paperData.id}
                 </Badge>
-                <Badge variant="outline" className="border-white/20 bg-white/5 text-slate-100">
+                <Badge variant="outline" className="border-border bg-card/50 text-card-foreground">
                   Engine: {formatValue(paperData.engine)}
                 </Badge>
                 <Badge
                   variant="outline"
-                  className={`border ${paperData.isOpenAccess ? 'border-emerald-400 text-emerald-300' : 'border-white/20 text-slate-100'}`}
+                  className={`border ${paperData.isOpenAccess ? 'border-primary text-primary' : 'border-border text-card-foreground'}`}
                 >
                   <ShieldCheck className="mr-1 h-3 w-3" />
                   {paperData.isOpenAccess ? 'Open Access' : 'Closed Access'}
                 </Badge>
-                <Badge variant="outline" className="border-white/20 bg-white/5 text-slate-100">
+                <Badge variant="outline" className="border-border bg-card/50 text-card-foreground">
                   {paperData.isPrePrint ? 'Pre-Print' : 'Published'}
                 </Badge>
-                <Badge variant="outline" className="border-white/20 bg-white/5 text-slate-100">
+                <Badge variant="outline" className="border-border bg-card/50 text-card-foreground">
                   Downloadable: {paperData.downloadable ? 'Yes' : 'No'}
                 </Badge>
                 {paperData.doi && (
-                  <Badge variant="outline" className="border-white/20 bg-white/5 text-slate-100">
+                  <Badge variant="outline" className="border-border bg-card/50 text-card-foreground">
                     DOI: {paperData.doi}
                   </Badge>
                 )}
@@ -717,13 +717,13 @@ export function PaperChatView({
 
           {/* TLDR Section */}
           <section className="space-y-3">
-            <p className="text-sm font-semibold uppercase tracking-[0.1em] text-slate-300">TLDR</p>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-sm">
-              <div className="mb-2 flex items-center gap-2 text-sm text-slate-200">
-                <Sparkles className="h-4 w-4 text-amber-300" />
+            <p className="text-sm font-semibold uppercase tracking-[0.1em] text-muted-foreground">TLDR</p>
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <div className="mb-2 flex items-center gap-2 text-sm text-card-foreground">
+                <Sparkles className="h-4 w-4 text-primary" />
                 <span>Key Takeaway</span>
               </div>
-              <p className="text-base leading-relaxed text-slate-100">
+              <p className="text-base leading-relaxed text-card-foreground">
                 {paperData.tldr || 'Not available'}
               </p>
             </div>
@@ -731,9 +731,9 @@ export function PaperChatView({
 
           {/* Abstract Section */}
           <section className="space-y-3">
-            <p className="text-sm font-semibold uppercase tracking-[0.1em] text-slate-300">Abstract</p>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-sm">
-              <p className="text-base leading-relaxed text-slate-100">
+            <p className="text-sm font-semibold uppercase tracking-[0.1em] text-muted-foreground">Abstract</p>
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+              <p className="text-base leading-relaxed text-card-foreground">
                 {paperData.abstract || 'Not available'}
               </p>
             </div>
@@ -741,8 +741,8 @@ export function PaperChatView({
 
           {/* Metadata Box */}
           <section className="space-y-3">
-            <p className="text-sm font-semibold uppercase tracking-[0.1em] text-slate-300">Metadata</p>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-sm">
+            <p className="text-sm font-semibold uppercase tracking-[0.1em] text-muted-foreground">Metadata</p>
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <MetaItem label="Publication Type" value={formatValue(paperData.publicationType)} />
                 <MetaItem label="Published Year" value={formatValue(paperData.year)} />
@@ -762,10 +762,10 @@ export function PaperChatView({
                       <div className="flex flex-wrap items-center gap-2">
                         {paperData.fieldsOfStudy.map((field: string, idx: number) => (
                           <div key={field} className="flex items-center gap-1">
-                            <Badge variant="outline" className="border-white/20 bg-white/5 text-slate-100">
+                            <Badge variant="outline" className="border-border bg-card/50 text-card-foreground">
                               {field}
                             </Badge>
-                            {idx < paperData.fieldsOfStudy.length - 1 && <span className="text-slate-500">,</span>}
+                            {idx < paperData.fieldsOfStudy.length - 1 && <span className="text-muted-foreground/50">,</span>}
                           </div>
                         ))}
                       </div>
@@ -780,8 +780,8 @@ export function PaperChatView({
 
           {/* Impact Metrics Box */}
           <section className="space-y-3">
-            <p className="text-sm font-semibold uppercase tracking-[0.1em] text-slate-300">Impact Metrics</p>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-sm">
+            <p className="text-sm font-semibold uppercase tracking-[0.1em] text-muted-foreground">Impact Metrics</p>
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <ImpactItem label="Citation Count" value={formatValue(paperData.impactFactor?.citationCount)} />
                 <ImpactItem label="Influential Citation Count" value={formatValue(paperData.impactFactor?.influentialCitationCount)} />
@@ -793,7 +793,7 @@ export function PaperChatView({
 
           {/* Access & External Links Box */}
           <section className="space-y-3">
-            <p className="text-sm font-semibold uppercase tracking-[0.1em] text-slate-300">Access & External Links</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.1em] text-muted-foreground">Access & External Links</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-fr">
               <AccessCard
                 label="PDF"
