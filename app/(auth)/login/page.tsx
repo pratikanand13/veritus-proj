@@ -115,84 +115,84 @@ function LoginForm() {
             boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)",
           }}
         >
-          <CardHeader className="space-y-1">
-            {/* Logo/Branding */}
-            <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-sm bg-primary text-primary-foreground">
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <div>
-                <CardTitle className="text-xl font-semibold text-white">
-                  Research Hub
-                </CardTitle>
-                <CardDescription className="text-xs text-white/80">
-                  Academic Papers Platform
-                </CardDescription>
-              </div>
+        <CardHeader className="space-y-1">
+          {/* Logo/Branding */}
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-sm bg-primary text-primary-foreground">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
             </div>
+            <div>
+                <CardTitle className="text-xl font-semibold text-white">
+                Research Hub
+              </CardTitle>
+                <CardDescription className="text-xs text-white/80">
+                Academic Papers Platform
+              </CardDescription>
+            </div>
+          </div>
             <CardTitle className="text-lg font-semibold text-center text-white">
-              Welcome Back
-            </CardTitle>
+            Welcome Back
+          </CardTitle>
             <CardDescription className="text-center text-white/80">
-              Enter your academic email to continue
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="p-3 text-sm text-destructive-foreground bg-destructive/20 border border-destructive rounded-sm">
-                  {error}
-                </div>
-              )}
-              
-              <div className="space-y-2">
+            Enter your academic email to continue
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="p-3 text-sm text-destructive-foreground bg-destructive/20 border border-destructive rounded-sm">
+                {error}
+              </div>
+            )}
+            
+            <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-white/90">
-                  Email
-                </label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="name@iiitg.ac.in"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
+                Email
+              </label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="name@iiitg.ac.in"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
                   className="rounded-md bg-black/20 border-white/20 text-white placeholder:text-white/50"
-                />
-              </div>
+              />
+            </div>
 
-              <div className="space-y-2">
+            <div className="space-y-2">
                 <label htmlFor="password" className="text-sm font-medium text-white/90">
-                  Password
-                </label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
+                Password
+              </label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
                   className="rounded-md bg-black/20 border-white/20 text-white placeholder:text-white/50"
-                />
-              </div>
+              />
+            </div>
 
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full"
-              >
-                {loading ? 'Logging in...' : 'Login'}
-              </Button>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full"
+            >
+              {loading ? 'Logging in...' : 'Login'}
+            </Button>
 
               <div className="text-center text-sm text-white/80">
-                Don't have an account?{' '}
-                <Link href="/signup" className="text-primary hover:underline font-medium">
-                  Sign up
-                </Link>
-              </div>
-            </form>
-          </CardContent>
+              Don't have an account?{' '}
+              <Link href="/signup" className="text-primary hover:underline font-medium">
+                Sign up
+              </Link>
+            </div>
+          </form>
+        </CardContent>
         </div>
       </div>
     </div>
@@ -215,9 +215,9 @@ export default function LoginPage() {
               boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)",
             }}
           >
-            <CardContent className="pt-6">
+          <CardContent className="pt-6">
               <div className="text-center text-white/80">Loading...</div>
-            </CardContent>
+          </CardContent>
           </div>
         </div>
       </div>

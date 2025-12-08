@@ -933,6 +933,7 @@ export default function DashboardPage() {
             <div className="flex-1 overflow-y-auto">
               <ProjectList
                 projects={projects}
+                chats={chats}
                 onSelectProject={async (projectId) => {
                   setSelectedProject(projectId)
                   await loadChats(projectId)
@@ -1082,6 +1083,7 @@ export default function DashboardPage() {
               ) : (
                 <ProjectList
                   projects={projects}
+                  chats={chats}
                   onSelectProject={async (projectId) => {
                     setSelectedProject(projectId)
                     await loadChats(projectId)

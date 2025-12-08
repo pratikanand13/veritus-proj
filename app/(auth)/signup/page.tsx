@@ -129,106 +129,106 @@ export default function SignupPage() {
             boxShadow: "0 8px 32px 0 rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)",
           }}
         >
-          <CardHeader className="space-y-1">
+        <CardHeader className="space-y-1">
             <CardTitle className="text-lg font-semibold text-center text-white">
-              Sign Up
-            </CardTitle>
+            Sign Up
+          </CardTitle>
             <CardDescription className="text-center text-white/80">
-              Create an account with your academic email
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="p-3 text-sm text-destructive-foreground bg-destructive/20 border border-destructive rounded-sm">
-                  {error}
-                </div>
-              )}
-              
-              <div className="space-y-2">
+            Create an account with your academic email
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="p-3 text-sm text-destructive-foreground bg-destructive/20 border border-destructive rounded-sm">
+                {error}
+              </div>
+            )}
+            
+            <div className="space-y-2">
                 <label htmlFor="name" className="text-sm font-medium text-white/90">
-                  Name
-                </label>
-                <Input
-                  id="name"
-                  name="name"
-                  type="text"
-                  placeholder="Your name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
+                Name
+              </label>
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                placeholder="Your name"
+                value={formData.name}
+                onChange={handleChange}
+                required
                   className="rounded-md bg-black/20 border-white/20 text-white placeholder:text-white/50"
-                />
-              </div>
+              />
+            </div>
 
-              <div className="space-y-2">
+            <div className="space-y-2">
                 <label htmlFor="email" className="text-sm font-medium text-white/90">
-                  Academic Email
-                </label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="name@iiitg.ac.in"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
+                Academic Email
+              </label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="name@iiitg.ac.in"
+                value={formData.email}
+                onChange={handleChange}
+                required
                   className="rounded-md bg-black/20 border-white/20 text-white placeholder:text-white/50"
-                />
+              />
                 <p className="text-xs text-white/70">
-                  Only academic email addresses (IIT, NIT, IIIT) are allowed
-                </p>
-              </div>
+                Only academic email addresses (IIT, NIT, IIIT) are allowed
+              </p>
+            </div>
 
-              <div className="space-y-2">
+            <div className="space-y-2">
                 <label htmlFor="areaOfInterest" className="text-sm font-medium text-white/90">
-                  Area of Interest
-                </label>
-                <Input
-                  id="areaOfInterest"
-                  name="areaOfInterest"
-                  type="text"
-                  placeholder="e.g., Machine Learning, Web Development"
-                  value={formData.areaOfInterest}
-                  onChange={handleChange}
-                  required
+                Area of Interest
+              </label>
+              <Input
+                id="areaOfInterest"
+                name="areaOfInterest"
+                type="text"
+                placeholder="e.g., Machine Learning, Web Development"
+                value={formData.areaOfInterest}
+                onChange={handleChange}
+                required
                   className="rounded-md bg-black/20 border-white/20 text-white placeholder:text-white/50"
-                />
-              </div>
+              />
+            </div>
 
-              <div className="space-y-2">
+            <div className="space-y-2">
                 <label htmlFor="password" className="text-sm font-medium text-white/90">
-                  Password
-                </label>
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  placeholder="At least 6 characters"
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                  minLength={6}
+                Password
+              </label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="At least 6 characters"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                minLength={6}
                   className="rounded-md bg-black/20 border-white/20 text-white placeholder:text-white/50"
-                />
-              </div>
+              />
+            </div>
 
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full"
-              >
-                {loading ? 'Creating account...' : 'Sign Up'}
-              </Button>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full"
+            >
+              {loading ? 'Creating account...' : 'Sign Up'}
+            </Button>
 
               <div className="text-center text-sm text-white/80">
-                Already have an account?{' '}
-                <Link href="/login" className="text-primary hover:underline font-medium">
-                  Login
-                </Link>
-              </div>
-            </form>
-          </CardContent>
+              Already have an account?{' '}
+              <Link href="/login" className="text-primary hover:underline font-medium">
+                Login
+              </Link>
+            </div>
+          </form>
+        </CardContent>
         </div>
       </div>
     </div>
