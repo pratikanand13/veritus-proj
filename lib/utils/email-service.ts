@@ -190,24 +190,107 @@ export async function sendDailyPaperEmail(
     return
   }
 
-  const transporter = createTransporter()
+  // Check if SMTP is configured
+  const smtpUser = process.env.SMTP_USER?.trim()
+  const smtpPassword = process.env.SMTP_PASSWORD?.trim()
+  const smtpHost = process.env.SMTP_HOST?.trim() || 'smtp.gmail.com'
+  const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10)
+  const smtpSecure = process.env.SMTP_SECURE === 'true'
+
+  // If SMTP not configured, log email content in development mode
+  if (!smtpUser || !smtpPassword) {
+    if (process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true') {
+      console.log('\n' + '='.repeat(60))
+      console.log('📧 DAILY PAPER EMAIL (Development Mode - SMTP not configured)')
+      console.log('='.repeat(60))
+      console.log(`To: ${userEmail}`)
+      console.log(`Subject: Your daily paper: ${recommendation.paperTitle}`)
+      console.log(`\nHi ${userName},`)
+      console.log(`\nHere's a paper recommendation based on your bookmark: ${recommendation.bookmarkTitle}`)
+      console.log(`\n${recommendation.paperTitle}`)
+      console.log(`\n${recommendation.tldr}`)
+      if (recommendation.pdfLink) {
+        console.log(`\nPDF Link: ${recommendation.pdfLink}`)
+      }
+      if (recommendation.paperId) {
+        console.log(`Paper ID: ${recommendation.paperId}`)
+      }
+      console.log('='.repeat(60) + '\n')
+      return // Don't throw error in dev mode
+    } else {
+      // In production, throw error if SMTP not configured
+      throw new Error('SMTP credentials not configured. Cannot send daily paper email.')
+    }
+  }
+
+  // Create transporter with explicit configuration
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpSecure, // true for 465, false for other ports
+    auth: {
+      user: smtpUser,
+      pass: smtpPassword,
+    },
+    // Add debug option in development
+    debug: process.env.NODE_ENV === 'development',
+    logger: process.env.NODE_ENV === 'development',
+  })
+
+  // Verify transporter configuration
+  try {
+    await transporter.verify()
+    console.log('SMTP server is ready to send emails')
+  } catch (verifyError) {
+    console.error('SMTP verification failed:', verifyError)
+    // In development, log and continue; in production, throw
+    if (process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true') {
+      console.log('Continuing in development mode despite SMTP verification failure')
+      return
+    } else {
+      throw new Error(`SMTP configuration error: ${verifyError instanceof Error ? verifyError.message : 'Unknown error'}`)
+    }
+  }
 
   const emailHtml = generateDailyEmailTemplate(userName, recommendation)
   const emailText = generateDailyEmailText(userName, recommendation)
 
   try {
-    await transporter.sendMail({
-      from: `"Research Paper Recommendations" <${process.env.SMTP_USER}>`,
+    const mailOptions = {
+      from: `"Research Paper Recommendations" <${smtpUser}>`,
       to: userEmail,
       subject: `Your daily paper: ${recommendation.paperTitle}`,
       html: emailHtml,
       text: emailText,
-    })
+    }
 
-    console.log(`Daily email sent successfully to ${userEmail}`)
+    console.log(`\n📧 Attempting to send email:`)
+    console.log(`   From: ${smtpUser}`)
+    console.log(`   To: ${userEmail}`)
+    console.log(`   Subject: ${mailOptions.subject}`)
+    console.log(`   Bookmark: ${recommendation.bookmarkTitle}`)
+    console.log(`   Paper: ${recommendation.paperTitle}\n`)
+
+    const info = await transporter.sendMail(mailOptions)
+
+    console.log(`✅ Daily email sent successfully!`)
+    console.log(`   To: ${userEmail}`)
+    console.log(`   Message ID: ${info.messageId}`)
+    console.log(`   Response: ${info.response}`)
+    console.log(`\n⚠️  IMPORTANT: If you don't see the email:`)
+    console.log(`   1. Check your SPAM/JUNK folder`)
+    console.log(`   2. Check if ${userEmail} is your correct email address`)
+    console.log(`   3. Wait a few minutes for delivery`)
+    console.log(`   4. Check email server filters\n`)
   } catch (error) {
-    console.error(`Failed to send daily email to ${userEmail}:`, error)
-    throw error
+    console.error(`❌ Failed to send daily email to ${userEmail}:`, error)
+    // In development, don't throw; in production, throw
+    if (process.env.NODE_ENV === 'development' || process.env.DEBUG === 'true') {
+      console.log('Email sending failed in development mode, but continuing...')
+      return
+    } else {
+      throw error
+    }
   }
 }
 

@@ -11,7 +11,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Bookmark, BookmarkCheck, Trash2, Mail, MailCheck, MailX, Loader2, Search, X } from 'lucide-react'
+import { Bookmark, BookmarkCheck, Trash2, Mail, MailCheck, MailX, Loader2, Search, X, Send } from 'lucide-react'
+import { toast } from '@/lib/utils/toast'
 // Table component - using simple div-based layout
 // Using simple confirm dialog instead of AlertDialog
 
@@ -45,6 +46,7 @@ export function BookmarksManagement({ open, onOpenChange }: BookmarksManagementP
     enabled: true,
   })
   const [updatingEmailSettings, setUpdatingEmailSettings] = useState(false)
+  const [runningPaperId, setRunningPaperId] = useState<string | null>(null)
 
   useEffect(() => {
     if (open) {
@@ -119,6 +121,41 @@ export function BookmarksManagement({ open, onOpenChange }: BookmarksManagementP
       console.error('Error updating email settings:', error)
     } finally {
       setUpdatingEmailSettings(false)
+    }
+  }
+
+  const handleInstantRun = async (bookmark: Bookmark) => {
+    if (!emailStatus.enabled) {
+      toast.error('Email notifications disabled', 'Please enable email notifications first.')
+      return
+    }
+
+    setRunningPaperId(bookmark.paperId)
+    try {
+      toast.info('Searching for similar papers...', 'This may take a moment.')
+      
+      const response = await fetch('/api/bookmarks/instant-run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paperId: bookmark.paperId }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        toast.error('Failed to run search', data.error || 'An error occurred.')
+        return
+      }
+
+      toast.success('Email sent!', `Paper recommendation sent to your email for "${bookmark.title}"`)
+      
+      // Refresh email status to update count
+      fetchEmailStatus()
+    } catch (error: any) {
+      console.error('Error running instant search:', error)
+      toast.error('Error', error.message || 'Failed to send email. Please try again.')
+    } finally {
+      setRunningPaperId(null)
     }
   }
 
@@ -236,17 +273,17 @@ export function BookmarksManagement({ open, onOpenChange }: BookmarksManagementP
               <div className="border rounded-lg overflow-hidden">
                 {/* Table Header */}
                 <div className="grid grid-cols-12 gap-4 p-4 bg-gray-100 border-b font-medium text-sm text-gray-700">
-                  <div className="col-span-5">Title</div>
+                  <div className="col-span-4">Title</div>
                   <div className="col-span-2">Authors</div>
                   <div className="col-span-2">Keywords</div>
                   <div className="col-span-2">Bookmarked</div>
-                  <div className="col-span-1">Actions</div>
+                  <div className="col-span-2">Actions</div>
                 </div>
                 {/* Table Body */}
                 <div className="divide-y">
                   {filteredBookmarks.map((bookmark) => (
                     <div key={bookmark.paperId} className="grid grid-cols-12 gap-4 p-4 hover:bg-gray-50">
-                      <div className="col-span-5">
+                      <div className="col-span-4">
                         <div className="font-medium text-gray-900">{bookmark.title}</div>
                         {bookmark.tldr && (
                           <div className="text-sm text-gray-500 mt-1 line-clamp-2">
@@ -278,7 +315,29 @@ export function BookmarksManagement({ open, onOpenChange }: BookmarksManagementP
                           {formatDate(bookmark.bookmarkedAt)}
                         </div>
                       </div>
-                      <div className="col-span-1">
+                      <div className="col-span-2 flex items-center gap-2">
+                        {emailStatus.enabled && bookmark.keywords && bookmark.keywords.length > 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleInstantRun(bookmark)}
+                            disabled={runningPaperId === bookmark.paperId}
+                            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            title="Run instant search and send results via email"
+                          >
+                            {runningPaperId === bookmark.paperId ? (
+                              <>
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                Running...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="h-4 w-4 mr-2" />
+                                Instant Run
+                              </>
+                            )}
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
