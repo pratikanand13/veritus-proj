@@ -182,3 +182,4 @@ Check logs for:
 - `0 23 * * *` = 11:00 PM UTC daily (4:30 AM IST next day)
 - `30 4 * * *` = 4:30 AM UTC daily (10:00 AM IST same day) - **NOT CORRECT**
 - Use timezone-aware schedulers when possible
+
