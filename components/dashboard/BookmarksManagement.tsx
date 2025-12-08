@@ -145,29 +145,29 @@ export function BookmarksManagement({ open, onOpenChange }: BookmarksManagementP
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center gap-2">
-              <Bookmark className="h-5 w-5 text-gray-400" />
-              <DialogTitle>Bookmarks Management</DialogTitle>
+              <Bookmark className="h-5 w-5 text-muted-foreground" />
+              <DialogTitle className="text-card-foreground">Bookmarks Management</DialogTitle>
             </div>
-            <DialogDescription>
+            <DialogDescription className="text-muted-foreground">
               Manage your bookmarked papers and email notification preferences
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6">
             {/* Email Notification Status */}
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="rounded-lg border border-border bg-card p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   {emailStatus.enabled ? (
-                    <MailCheck className="h-5 w-5 text-green-600" />
+                    <MailCheck className="h-5 w-5 text-primary" />
                   ) : (
-                    <MailX className="h-5 w-5 text-gray-400" />
+                    <MailX className="h-5 w-5 text-muted-foreground" />
                   )}
                   <div>
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-card-foreground">
                       Email Notifications: {emailStatus.enabled ? 'Enabled' : 'Disabled'}
                     </div>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-muted-foreground">
                       {emailStatus.lastSent
                         ? `Last sent: ${formatDate(emailStatus.lastSent)}`
                         : 'No emails sent yet'}
@@ -181,6 +181,7 @@ export function BookmarksManagement({ open, onOpenChange }: BookmarksManagementP
                   disabled={updatingEmailSettings}
                   variant={emailStatus.enabled ? 'outline' : 'default'}
                   size="sm"
+                  className={emailStatus.enabled ? 'border-border hover:bg-accent' : ''}
                 >
                   {updatingEmailSettings ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -196,21 +197,21 @@ export function BookmarksManagement({ open, onOpenChange }: BookmarksManagementP
 
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search bookmarks by title, authors, or keywords..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 bg-card border-border text-card-foreground placeholder:text-muted-foreground"
               />
               {searchQuery && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0 hover:bg-accent"
                   onClick={() => setSearchQuery('')}
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-4 w-4 text-muted-foreground" />
                 </Button>
               )}
             </div>
@@ -218,24 +219,24 @@ export function BookmarksManagement({ open, onOpenChange }: BookmarksManagementP
             {/* Bookmarks Table */}
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : filteredBookmarks.length === 0 ? (
               <div className="text-center py-12">
-                <Bookmark className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">
+                <Bookmark className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
+                <p className="text-card-foreground">
                   {searchQuery ? 'No bookmarks match your search' : 'No bookmarks yet'}
                 </p>
-                <p className="text-sm text-gray-400 mt-2">
+                <p className="text-sm text-muted-foreground mt-2">
                   {searchQuery
                     ? 'Try adjusting your search terms'
                     : 'Bookmark papers to receive daily email recommendations'}
                 </p>
               </div>
             ) : (
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border border-border rounded-lg overflow-hidden bg-card">
                 {/* Table Header */}
-                <div className="grid grid-cols-12 gap-4 p-4 bg-gray-100 border-b font-medium text-sm text-gray-700">
+                <div className="grid grid-cols-12 gap-4 p-4 bg-muted/50 border-b border-border font-medium text-sm text-card-foreground">
                   <div className="col-span-5">Title</div>
                   <div className="col-span-2">Authors</div>
                   <div className="col-span-2">Keywords</div>
@@ -243,38 +244,38 @@ export function BookmarksManagement({ open, onOpenChange }: BookmarksManagementP
                   <div className="col-span-1">Actions</div>
                 </div>
                 {/* Table Body */}
-                <div className="divide-y">
+                <div className="divide-y divide-border">
                   {filteredBookmarks.map((bookmark) => (
-                    <div key={bookmark.paperId} className="grid grid-cols-12 gap-4 p-4 hover:bg-gray-50">
+                    <div key={bookmark.paperId} className="grid grid-cols-12 gap-4 p-4 hover:bg-accent/50 transition-colors">
                       <div className="col-span-5">
-                        <div className="font-medium text-gray-900">{bookmark.title}</div>
+                        <div className="font-medium text-card-foreground">{bookmark.title}</div>
                         {bookmark.tldr && (
-                          <div className="text-sm text-gray-500 mt-1 line-clamp-2">
+                          <div className="text-sm text-muted-foreground mt-1 line-clamp-2">
                             {bookmark.tldr}
                           </div>
                         )}
                       </div>
                       <div className="col-span-2">
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-muted-foreground">
                           {bookmark.authors || 'N/A'}
                         </div>
                       </div>
                       <div className="col-span-2">
                         <div className="flex flex-wrap gap-1">
                           {bookmark.keywords.slice(0, 3).map((keyword, idx) => (
-                            <Badge key={idx} variant="outline" className="text-xs">
+                            <Badge key={idx} variant="outline" className="text-xs border-border bg-card/50 text-card-foreground">
                               {keyword.length > 15 ? `${keyword.substring(0, 15)}...` : keyword}
                             </Badge>
                           ))}
                           {bookmark.keywords.length > 3 && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs border-border bg-card/50 text-card-foreground">
                               +{bookmark.keywords.length - 3}
                             </Badge>
                           )}
                         </div>
                       </div>
                       <div className="col-span-2">
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm text-muted-foreground">
                           {formatDate(bookmark.bookmarkedAt)}
                         </div>
                       </div>
@@ -284,7 +285,7 @@ export function BookmarksManagement({ open, onOpenChange }: BookmarksManagementP
                           size="sm"
                           onClick={() => handleDelete(bookmark)}
                           disabled={deletingId === bookmark.paperId}
-                          className="text-destructive hover:text-destructive"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
                         >
                           {deletingId === bookmark.paperId ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -301,7 +302,7 @@ export function BookmarksManagement({ open, onOpenChange }: BookmarksManagementP
 
             {/* Summary */}
             {bookmarks.length > 0 && (
-              <div className="text-sm text-gray-500 text-center">
+              <div className="text-sm text-muted-foreground text-center">
                 Showing {filteredBookmarks.length} of {bookmarks.length} bookmark
                 {bookmarks.length !== 1 ? 's' : ''}
               </div>
